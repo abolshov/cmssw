@@ -5,7 +5,8 @@
 #else
 #include "Alignment/MuonAlignmentAlgorithms/interface/MuonResiduals6DOFFitter.h"
 #endif
-
+#include "DataFormats/DetId/interface/DetId.h"
+#include "DataFormats/MuonDetId/interface/DTChamberId.h"
 #include "TH2F.h"
 #include "TMath.h"
 #include "TTree.h"
@@ -181,7 +182,9 @@ void MuonResiduals6DOFFitter_FCN(int &npar, double *gin, double &fval, double *p
     double weight = (1. / redchi2) * number_of_hits / sum_of_weights;
     if (!weight_alignment)
       weight = 1.;
-
+    weight *= (*resiter)
+        [MuonResiduals6DOFFitter::
+             kWeightOccupancy];  //Weights to have flat occupancy for now (are set to 1 if the weigth-constructor has not the path to the root file with weights)
     if (!weight_alignment || TMath::Prob(redchi2 * 12, 12) < 0.99)  // no spikes allowed
     {
       if (fitter->residualsModel() == MuonResidualsFitter::kPureGaussian) {
@@ -203,10 +206,6 @@ void MuonResiduals6DOFFitter_FCN(int &npar, double *gin, double &fval, double *p
         } else if (fitter->useRes() == MuonResidualsFitter::k0010) {
           fval += -weight * MuonResidualsFitter_logPureGaussian(resslopeX, slopeXpeak, slopeXsigma);
         }
-        //std::cout<<"FCNx("<<residX<<","<<residXpeak<<","<<resXsigma<<") = "<<MuonResidualsFitter_logPureGaussian(residX, residXpeak, resXsigma)<<std::endl;
-        //std::cout<<"FCNy("<<residY<<","<<residYpeak<<","<<resYsigma<<") = "<<MuonResidualsFitter_logPureGaussian(residY, residYpeak, resYsigma)<<std::endl;
-        //std::cout<<"FCNsx("<<resslopeX<<","<<slopeXpeak<<","<<slopeXsigma<<") = "<<MuonResidualsFitter_logPureGaussian(resslopeX, slopeXpeak, slopeXsigma)<<std::endl;
-        //std::cout<<"FCNsy("<<resslopeY<<","<<slopeYpeak<<","<<slopeYsigma<<") = "<<MuonResidualsFitter_logPureGaussian(resslopeY, slopeYpeak, slopeYsigma)<<std::endl;
       } else if (fitter->residualsModel() == MuonResidualsFitter::kPureGaussian2D) {
         if (fitter->useRes() == MuonResidualsFitter::k1111) {
           fval += -weight * MuonResidualsFitter_logPureGaussian2D(
@@ -436,8 +435,10 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
     low.push_back(lows[idx[i]]);
     high.push_back(highs[idx[i]]);
   }
-
-  return dofit(&MuonResiduals6DOFFitter_FCN, num, name, start, step, low, high);
+  DTChamberId myid(ali->geomDetId().rawId());
+  int wheel = myid.wheel(), station = myid.station(), sector = myid.sector();
+  std::string chmamber_id = std::to_string(wheel) + "_" + std::to_string(station) + "_" + std::to_string(sector);
+  return dofit(&MuonResiduals6DOFFitter_FCN, num, name, start, step, low, high, chmamber_id);
 }
 
 double MuonResiduals6DOFFitter::plot(std::string name, TFileDirectory *dir, Alignable *ali) {

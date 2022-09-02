@@ -149,8 +149,8 @@ bool MuonResiduals1DOFFitter::fit(Alignable *ali) {
     low.push_back(0.);
     high.push_back(0.);
   }
-
-  return dofit(&MuonResiduals1DOFFitter_FCN, num, name, start, step, low, high);
+  std::string chmamber_id = "NULL";
+  return dofit(&MuonResiduals1DOFFitter_FCN, num, name, start, step, low, high, chmamber_id);
 }
 
 double MuonResiduals1DOFFitter::plot(std::string name, TFileDirectory *dir, Alignable *ali) {

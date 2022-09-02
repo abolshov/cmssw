@@ -48,7 +48,6 @@ public:
 private:
   // es token
   const edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> m_esTokenGBTGeom;
-  const edm::ESGetToken<DetIdAssociator, DetIdAssociatorRecord> m_esTokenDetId;
   const edm::ESGetToken<Propagator, TrackingComponentsRecord> m_esTokenProp;
   const edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> m_esTokenMF;
   const MuonResidualsFromTrack::BuilderToken m_esTokenBuilder;
@@ -153,7 +152,6 @@ AlignmentMonitorMuonSystemMap1D::AlignmentMonitorMuonSystemMap1D(const edm::Para
                                                                  edm::ConsumesCollector iC)
     : AlignmentMonitorBase(cfg, iC, "AlignmentMonitorMuonSystemMap1D"),
       m_esTokenGBTGeom(iC.esConsumes()),
-      m_esTokenDetId(iC.esConsumes(edm::ESInputTag("", "MuonDetIdAssociator"))),
       m_esTokenProp(iC.esConsumes(edm::ESInputTag("", "SteppingHelixPropagatorAny"))),
       m_esTokenMF(iC.esConsumes()),
       m_esTokenBuilder(iC.esConsumes(MuonResidualsFromTrack::builderESInputTag())),
@@ -270,7 +268,6 @@ void AlignmentMonitorMuonSystemMap1D::event(const edm::Event &iEvent,
   iEvent.getByLabel(m_beamSpotTag, beamSpot);
 
   const GlobalTrackingGeometry *globalGeometry = &iSetup.getData(m_esTokenGBTGeom);
-  const DetIdAssociator *muonDetIdAssociator_ = &iSetup.getData(m_esTokenDetId);
   const Propagator *prop = &iSetup.getData(m_esTokenProp);
   const MagneticField *magneticField = &iSetup.getData(m_esTokenMF);
   auto builder = iSetup.getHandle(m_esTokenBuilder);
@@ -290,7 +287,7 @@ void AlignmentMonitorMuonSystemMap1D::event(const edm::Event &iEvent,
           m_counter_trackdxy++;
 
           MuonResidualsFromTrack muonResidualsFromTrack(
-              builder, magneticField, globalGeometry, muonDetIdAssociator_, prop, traj, track, pNavigator(), 1000.);
+              builder, magneticField, globalGeometry, prop, traj, track, pNavigator(), 1000.);
           processMuonResidualsFromTrack(muonResidualsFromTrack, iEvent);
         }
       }  // end if track has acceptable momentum

@@ -88,6 +88,3 @@ DTGeometryAlignmentProducerAsAnalyzer.appendToDataLabel = 'idealForAlignmentProd
 import Geometry.CSCGeometryBuilder.cscGeometryDB_cfi
 CSCGeometryAlignmentProducerAsAnalyzer = Geometry.CSCGeometryBuilder.cscGeometryDB_cfi.CSCGeometryESModule.clone()
 CSCGeometryAlignmentProducerAsAnalyzer.appendToDataLabel = 'idealForAlignmentProducerBase'
-import   Geometry.GEMGeometryBuilder.gemGeometryDB_cfi
-GEMGeometryAlignmentProducerAsAnalyzer = Geometry.GEMGeometryBuilder.gemGeometryDB_cfi.GEMGeometryESModule.clone()
-GEMGeometryAlignmentProducerAsAnalyzer.appendToDataLabel = 'idealForAlignmentProducerBase'

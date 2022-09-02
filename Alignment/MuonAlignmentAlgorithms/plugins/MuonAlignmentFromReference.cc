@@ -9,7 +9,7 @@ Description: <one line class summary>
 
 Implementation:
 <Notes on implementation>
-*/
+ */
 //
 // Original Author:  Jim Pivarski,,,
 //         Created:  Sat Jan 24 16:20:28 CST 2009
@@ -33,11 +33,11 @@ Implementation:
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "TrackingTools/Records/interface/TrackingComponentsRecord.h"
-#include "TrackingTools/Records/interface/DetIdAssociatorRecord.h"
 #include "TrackingTools/GeomPropagators/interface/Propagator.h"
 
 #include "DataFormats/MuonDetId/interface/MuonSubdetId.h"
 #include "DataFormats/MuonDetId/interface/DTChamberId.h"
+#include "DataFormats/MuonDetId/interface/CSCDetId.h"
 #include "DataFormats/MuonDetId/interface/DTSuperLayerId.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/BeamSpot/interface/BeamSpot.h"
@@ -62,6 +62,12 @@ Implementation:
 #include "Alignment/MuonAlignmentAlgorithms/interface/MuonResiduals5DOFFitter.h"
 #include "Alignment/MuonAlignmentAlgorithms/interface/MuonResiduals6DOFrphiFitter.h"
 #include "Alignment/MuonAlignmentAlgorithms/interface/MuonResidualsTwoBin.h"
+
+#include "Alignment/MuonAlignmentAlgorithms/interface/DTTTree.h"
+#include "Alignment/MuonAlignmentAlgorithms/interface/CSCTTree.h"
+#include "Alignment/MuonAlignmentAlgorithms/interface/FlatOccupancy.h"
+
+#include "TrackingTools/Records/interface/DetIdAssociatorRecord.h"
 
 #include "TFile.h"
 #include "TTree.h"
@@ -90,6 +96,8 @@ public:
 
   void terminate(const edm::EventSetup& iSetup) override;
 
+  FlatOccupancy myOccupancyMap;
+
 private:
   bool numeric(std::string s);
   int number(std::string s);
@@ -115,7 +123,6 @@ private:
   const edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> m_globTackingToken;
   const edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> m_MagFieldToken;
   const edm::ESGetToken<Propagator, TrackingComponentsRecord> m_propToken;
-  const edm::ESGetToken<DetIdAssociator, DetIdAssociatorRecord> m_DetIdToken;
   const MuonResidualsFromTrack::BuilderToken m_builderToken;
 
   // configutarion paramenters:
@@ -151,6 +158,10 @@ private:
   bool m_doCSC;
   std::string m_useResiduals;
 
+  //Layer Plots
+  bool m_createLayerNtuple_DT;
+  bool m_createLayerNtuple_CSC;
+
   // utility objects
   AlignableNavigator* m_alignableNavigator;
   AlignmentParameterStore* m_alignmentParameterStore;
@@ -185,10 +196,16 @@ private:
   long m_counter_cscaligning;
   long m_counter_resslopey;
 
-  // debug ntuple
+  // Ntuples for debug
   void bookNtuple();
+  void bookNtupleLayers_DT();
+  void bookNtupleLayers_CSC();
   TTree* m_ttree;
+  TTree* m_ttree_DT_layers;
+  TTree* m_ttree_CSC_layers;
   MuonResidualsFitter::MuonAlignmentTreeRow m_tree_row;
+  DTLayerData layerData_DT;
+  CSCLayerData layerData_CSC;
 
   bool m_debug;
 };
@@ -199,7 +216,6 @@ MuonAlignmentFromReference::MuonAlignmentFromReference(const edm::ParameterSet& 
       m_globTackingToken(iC.esConsumes()),
       m_MagFieldToken(iC.esConsumes()),
       m_propToken(iC.esConsumes(edm::ESInputTag("", "SteppingHelixPropagatorAny"))),
-      m_DetIdToken(iC.esConsumes(edm::ESInputTag("", "MuonDetIdAssociator"))),
       m_builderToken(iC.esConsumes(MuonResidualsFromTrack::builderESInputTag())),
       m_muonCollectionTag(cfg.getParameter<edm::InputTag>("muonCollectionTag")),
       m_reference(cfg.getParameter<std::vector<std::string> >("reference")),
@@ -231,7 +247,9 @@ MuonAlignmentFromReference::MuonAlignmentFromReference(const edm::ParameterSet& 
       m_BFieldCorrection(cfg.getParameter<int>("bFieldCorrection")),
       m_doDT(cfg.getParameter<bool>("doDT")),
       m_doCSC(cfg.getParameter<bool>("doCSC")),
-      m_useResiduals(cfg.getParameter<std::string>("useResiduals")) {
+      m_useResiduals(cfg.getParameter<std::string>("useResiduals")),
+      m_createLayerNtuple_DT(cfg.getParameter<bool>("createLayerNtupleDT")),
+      m_createLayerNtuple_CSC(cfg.getParameter<bool>("createLayerNtupleCSC")) {
   // alignment requires a TFile to provide plots to check the fit output
   // just filling the residuals lists does not
   // but we don't want to wait until the end of the job to find out that the TFile is missing
@@ -244,6 +262,17 @@ MuonAlignmentFromReference::MuonAlignmentFromReference(const edm::ParameterSet& 
   m_ttree = nullptr;
   if (m_createNtuple)
     bookNtuple();
+  //Layer Ntuples
+  m_ttree_DT_layers = nullptr;   //By default the TTree is nullptr
+  m_ttree_CSC_layers = nullptr;  //By default the TTree is nullptr
+  if (m_createLayerNtuple_DT) {
+    layerData_DT.doFill = true;
+    bookNtupleLayers_DT();
+  }
+  if (m_createLayerNtuple_CSC) {
+    layerData_CSC.doFill = true;
+    bookNtupleLayers_CSC();
+  }
 
   m_counter_events = 0;
   m_counter_tracks = 0;
@@ -269,6 +298,9 @@ MuonAlignmentFromReference::MuonAlignmentFromReference(const edm::ParameterSet& 
   m_counter_cscaligning = 0;
   m_counter_resslopey = 0;
 
+  //myOccupancyMap.LoadWeigths("/afs/cern.ch/work/l/lpernie/MuonAlign/WD/FixOccupancy/CMSSW_8_0_17/src/LayerPlots/Output_Occupancy/Output_weights.root"); //Place a root file containing the weight map for the 250 DTs as a function of X and Y, if you want flat occupancy (and decomment the weight part in MuonResidualsXDOFFitter.cc).
+  myOccupancyMap.LoadWeigths(
+      "");  //Place a root file containing the weight map for the 250 DTs as a function of X and Y, if you want flat occupancy (and decomment the weight part in MuonResidualsXDOFFitter.cc).
   m_debug = false;
 }
 
@@ -293,8 +325,61 @@ void MuonAlignmentFromReference::bookNtuple() {
   m_ttree->Branch("pz", &m_tree_row.pz, "pz/F");
   m_ttree->Branch("pt", &m_tree_row.pt, "pt/F");
   m_ttree->Branch("q", &m_tree_row.q, "q/B");
+  m_ttree->Branch("OccuWeight", &m_tree_row.OccuWeight, "OccuWeight/F");
   m_ttree->Branch("select", &m_tree_row.select, "select/O");
-  //m_ttree->Branch("",&m_tree_row.,"/");
+}
+
+void MuonAlignmentFromReference::bookNtupleLayers_DT() {
+  edm::Service<TFileService> fs;
+  m_ttree_DT_layers = fs->make<TTree>("dt_layer_ttree", "dt_layer_ttree");
+  m_ttree_DT_layers->Branch("charge", &(layerData_DT.charge), "charge/i");
+  m_ttree_DT_layers->Branch("nEvent", &(layerData_DT.nEvent), "nEvent/i");
+  m_ttree_DT_layers->Branch("nlayers", &(layerData_DT.nlayers), "nlayers/i");
+  m_ttree_DT_layers->Branch("nDT", &(layerData_DT.nDT), "nDT/i");
+  m_ttree_DT_layers->Branch("nCSC", &(layerData_DT.nDT), "nCSC/i");
+  m_ttree_DT_layers->Branch("nTracker", &(layerData_DT.nTracker), "nTracker/i");
+
+  m_ttree_DT_layers->Branch("wheel", &(layerData_DT.wheel), "wheel/b");
+  m_ttree_DT_layers->Branch("station", &(layerData_DT.station), "station/b");
+  m_ttree_DT_layers->Branch("sector", &(layerData_DT.sector), "sector/b");
+
+  m_ttree_DT_layers->Branch("pt", &(layerData_DT.pt), "pt/F");
+  m_ttree_DT_layers->Branch("pz", &(layerData_DT.pz), "pz/F");
+  m_ttree_DT_layers->Branch("eta", &(layerData_DT.eta), "eta/F");
+  m_ttree_DT_layers->Branch("phi", &(layerData_DT.phi), "phi/F");
+
+  m_ttree_DT_layers->Branch("hit_x", &(layerData_DT.v_hitx), "hit_x[8]/F");
+  m_ttree_DT_layers->Branch("hit_y", &(layerData_DT.v_hity), "hit_y[4]/F");
+  m_ttree_DT_layers->Branch("track_x", &(layerData_DT.v_trackx), "track_x[8]/F");
+  m_ttree_DT_layers->Branch("track_y", &(layerData_DT.v_tracky), "track_y[4]/F");
+  m_ttree_DT_layers->Branch("track_y_x_layer", &(layerData_DT.v_tracky_x_layer), "track_y_x_layer[4]/F");
+}
+
+void MuonAlignmentFromReference::bookNtupleLayers_CSC() {
+  edm::Service<TFileService> fs;
+  m_ttree_CSC_layers = fs->make<TTree>("csc_layer_ttree", "csc_layer_ttree");
+  m_ttree_CSC_layers->Branch("charge", &(layerData_CSC.charge), "charge/i");
+  m_ttree_CSC_layers->Branch("nEvent", &(layerData_CSC.nEvent), "nEvent/i");
+  m_ttree_CSC_layers->Branch("nlayers", &(layerData_CSC.nlayers), "nlayers/i");
+
+  m_ttree_CSC_layers->Branch("nDT", &(layerData_CSC.nDT), "nDT/i");
+  m_ttree_CSC_layers->Branch("nCSC", &(layerData_CSC.nCSC), "nCSC/i");
+  m_ttree_CSC_layers->Branch("nTracker", &(layerData_CSC.nTracker), "nTracker/i");
+
+  m_ttree_CSC_layers->Branch("endcap", &(layerData_CSC.endcap), "endcap/b");
+  m_ttree_CSC_layers->Branch("station", &(layerData_CSC.station), "station/b");
+  m_ttree_CSC_layers->Branch("ring", &(layerData_CSC.ring), "ring/b");
+  m_ttree_CSC_layers->Branch("chamber", &(layerData_CSC.chamber), "chamber/b");
+
+  m_ttree_CSC_layers->Branch("pt", &(layerData_CSC.pt), "pt/F");
+  m_ttree_CSC_layers->Branch("pz", &(layerData_CSC.pz), "pz/F");
+  m_ttree_CSC_layers->Branch("eta", &(layerData_CSC.eta), "eta/F");
+  m_ttree_CSC_layers->Branch("phi", &(layerData_CSC.phi), "phi/F");
+
+  m_ttree_CSC_layers->Branch("hit_x", &(layerData_CSC.v_hitx), "hit_x[6]/F");
+  m_ttree_CSC_layers->Branch("hit_y", &(layerData_CSC.v_hity), "hit_y[6]/F");
+  m_ttree_CSC_layers->Branch("res_x", &(layerData_CSC.v_resx), "res_x[6]/F");
+  m_ttree_CSC_layers->Branch("res_y", &(layerData_CSC.v_resy), "res_y[6]/F");
 }
 
 bool MuonAlignmentFromReference::numeric(std::string s) { return s.length() == 1 && std::isdigit(s[0]); }
@@ -363,7 +448,6 @@ void MuonAlignmentFromReference::initialize(const edm::EventSetup& iSetup,
     // fitters for DT
     if (ali->alignableObjectId() == align::AlignableDTChamber) {
       DTChamberId id(ali->geomDetId().rawId());
-
       if (id.station() == 4) {
         m_fitters[ali] = new MuonResidualsTwoBin(
             m_twoBin,
@@ -409,10 +493,9 @@ void MuonAlignmentFromReference::initialize(const edm::EventSetup& iSetup,
       }
     }
 
-    else {
+    else
       throw cms::Exception("MuonAlignmentFromReference")
           << "only DTChambers and CSCChambers can be aligned with this module" << std::endl;
-    }
 
     if (made_fitter) {
       m_fitters[ali]->setStrategy(m_strategy);
@@ -442,18 +525,16 @@ void MuonAlignmentFromReference::run(const edm::EventSetup& iSetup, const EventI
   if (m_debug)
     std::cout << "****** EVENT START *******" << std::endl;
   m_counter_events++;
-
   const GlobalTrackingGeometry* globalGeometry = &iSetup.getData(m_globTackingToken);
   const MagneticField* magneticField = &iSetup.getData(m_MagFieldToken);
   const Propagator* prop = &iSetup.getData(m_propToken);
-  const DetIdAssociator* muonDetIdAssociator = &iSetup.getData(m_DetIdToken);
   auto builder = iSetup.getHandle(m_builderToken);
 
   if (m_muonCollectionTag.label().empty())  // use trajectories
   {
     if (m_debug)
       std::cout << "JUST BEFORE LOOP OVER trajTrackPairs" << std::endl;
-    // const ConstTrajTrackPairCollection &trajtracks = eventInfo.trajTrackPairs_; // trajTrackPairs_ now private
+
     const ConstTrajTrackPairCollection& trajtracks = eventInfo.trajTrackPairs();
 
     for (ConstTrajTrackPairCollection::const_iterator trajtrack = trajtracks.begin(); trajtrack != trajtracks.end();
@@ -474,12 +555,17 @@ void MuonAlignmentFromReference::run(const edm::EventSetup& iSetup, const EventI
           MuonResidualsFromTrack muonResidualsFromTrack(builder,
                                                         magneticField,
                                                         globalGeometry,
-                                                        muonDetIdAssociator,
                                                         prop,
                                                         traj,
                                                         track,
                                                         m_alignableNavigator,
-                                                        1000.);
+                                                        1000.,
+                                                        m_createLayerNtuple_DT,
+                                                        m_createLayerNtuple_CSC,
+                                                        &layerData_DT,
+                                                        m_ttree_DT_layers,
+                                                        &layerData_CSC,
+                                                        m_ttree_CSC_layers);
           if (m_debug)
             std::cout << "JUST AFTER muonResidualsFromTrack" << std::endl;
 
@@ -494,54 +580,23 @@ void MuonAlignmentFromReference::run(const edm::EventSetup& iSetup, const EventI
     if (m_debug)
       std::cout << "JUST AFTER LOOP OVER trajTrackPairs" << std::endl;
 
-  } else  // use muons
-  {
-    /*
-           for (reco::MuonCollection::const_iterator muon = eventInfo.muonCollection_->begin();  muon != eventInfo.muonCollection_->end();  ++muon)
-           {
-           if ( !(muon->isTrackerMuon() && muon->innerTrack().isNonnull() ) ) continue;
-
-           m_counter_tracks++;
-
-           if (m_minTrackPt < muon->pt()  &&  muon->pt() < m_maxTrackPt && m_minTrackP < muon->p()  &&  muon->p() < m_maxTrackP)
-           {
-           m_counter_trackmomentum++;
-
-           if (fabs(muon->innerTrack()->dxy(eventInfo.beamSpot_.position())) < m_maxDxy)
-           {
-           m_counter_trackdxy++;
-
-        //std::cout<<"    *** will make MuonResidualsFromTrack ***"<<std::endl;
-        MuonResidualsFromTrack muonResidualsFromTrack(globalGeometry, &(*muon), m_alignableNavigator, 100.);
-        //std::cout<<"    *** have made MuonResidualsFromTrack ***"<<std::endl;
-
-        //std::cout<<" trk eta="<<muon->eta()<<" ndof="<<muon->innerTrack()->ndof()<<" nchi2="<<muon->innerTrack()->normalizedChi2()
-        //         <<" muresnchi2="<<muonResidualsFromTrack.normalizedChi2()<<" muresnhits="<<muonResidualsFromTrack.trackerNumHits()<<std::endl;
-
-        processMuonResidualsFromTrack(muonResidualsFromTrack);
-        } // end if track p is within range
-        } // end if track pT is within range
-        } // end loop over tracks
-        */
+  } else {  // use muons
+    std::cout << "WARNING!!! you are not using Trajectories." << std::endl;
   }
 }
 
 void MuonAlignmentFromReference::processMuonResidualsFromTrack(MuonResidualsFromTrack& mrft) {
-  // std::cout << "minTrackerHits: " << mrft.trackerNumHits() << std::endl;
   if (mrft.trackerNumHits() >= m_minTrackerHits) {
     m_counter_trackerhits++;
-    // std::cout << "mrft.normalizedChi2(): " << mrft.normalizedChi2() << std::endl;
 
     if (mrft.normalizedChi2() < m_maxTrackerRedChi2) {
       m_counter_trackerchi2++;
       if (m_allowTIDTEC || !mrft.contains_TIDTEC()) {
         m_counter_trackertidtec++;
-
         std::vector<DetId> chamberIds = mrft.chamberIds();
 
         if ((int)chamberIds.size() >= m_minNCrossedChambers) {
           m_counter_minchambers++;
-
           char charge = (mrft.getTrack()->charge() > 0 ? 1 : -1);
 
           for (std::vector<DetId>::const_iterator chamberId = chamberIds.begin(); chamberId != chamberIds.end();
@@ -554,7 +609,6 @@ void MuonAlignmentFromReference::processMuonResidualsFromTrack(MuonResidualsFrom
             if (m_doDT && chamberId->subdetId() == MuonSubdetId::DT && DTChamberId(chamberId->rawId()).station() != 4) {
               MuonChamberResidual* dt13 = mrft.chamberResidual(*chamberId, MuonChamberResidual::kDT13);
               MuonChamberResidual* dt2 = mrft.chamberResidual(*chamberId, MuonChamberResidual::kDT2);
-
               m_counter_station123++;
               if (dt13 != nullptr && dt2 != nullptr) {
                 m_counter_station123valid++;
@@ -587,7 +641,12 @@ void MuonAlignmentFromReference::processMuonResidualsFromTrack(MuonResidualsFrom
                         residdata[MuonResiduals6DOFFitter::kSector] = DTChamberId(chamberId->rawId()).sector();
                         residdata[MuonResiduals6DOFFitter::kChambW] = dt13->ChambW();
                         residdata[MuonResiduals6DOFFitter::kChambl] = dt13->Chambl();
-
+                        residdata[MuonResiduals6DOFFitter::kWeightOccupancy] =
+                            myOccupancyMap.GiveCorrection(DTChamberId(chamberId->rawId()).wheel(),
+                                                          DTChamberId(chamberId->rawId()).station(),
+                                                          DTChamberId(chamberId->rawId()).sector(),
+                                                          dt13->trackx(),
+                                                          dt13->tracky());
                         if (m_debug) {
                           std::cout << "processMuonResidualsFromTrack 6DOF dt13->residual()  " << dt13->residual()
                                     << std::endl;
@@ -648,7 +707,12 @@ void MuonAlignmentFromReference::processMuonResidualsFromTrack(MuonResidualsFrom
                     residdata[MuonResiduals5DOFFitter::kSector] = DTChamberId(chamberId->rawId()).sector();
                     residdata[MuonResiduals5DOFFitter::kChambW] = dt13->ChambW();
                     residdata[MuonResiduals5DOFFitter::kChambl] = dt13->Chambl();
-
+                    residdata[MuonResiduals5DOFFitter::kWeightOccupancy] =
+                        myOccupancyMap.GiveCorrection(DTChamberId(chamberId->rawId()).wheel(),
+                                                      DTChamberId(chamberId->rawId()).station(),
+                                                      DTChamberId(chamberId->rawId()).sector(),
+                                                      dt13->trackx(),
+                                                      dt13->tracky());
                     if (m_debug) {
                       std::cout << "processMuonResidualsFromTrack 5DOF dt13->residual()  " << dt13->residual()
                                 << std::endl;
@@ -790,12 +854,19 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
     stop_watch.Stop();
   }
 
-  if (m_doAlignment && !m_doCSC)  // for now apply fiducial cuts to DT only
-  {
+  if (m_doAlignment) {
     stop_watch.Start();
     fiducialCuts();
     if (m_debug)
       std::cout << "fiducialCuts took " << stop_watch.CpuTime() << " sec" << std::endl;
+    stop_watch.Stop();
+  }
+
+  if (m_doAlignment) {
+    stop_watch.Start();
+    eraseNotSelectedResiduals();
+    if (m_debug)
+      std::cout << "eraseNotSelectedResiduals took " << stop_watch.CpuTime() << " sec" << std::endl;
     stop_watch.Stop();
   }
 
@@ -805,14 +876,6 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
     fillNtuple();
     if (m_debug)
       std::cout << "fillNtuple took " << stop_watch.CpuTime() << " sec" << std::endl;
-    stop_watch.Stop();
-  }
-
-  if (m_doAlignment) {
-    stop_watch.Start();
-    eraseNotSelectedResiduals();
-    if (m_debug)
-      std::cout << "eraseNotSelectedResiduals took " << stop_watch.CpuTime() << " sec" << std::endl;
     stop_watch.Stop();
   }
 
@@ -860,6 +923,7 @@ void MuonAlignmentFromReference::fitAndAlign() {
            << "        self.chamberId, self.postal_address, self.name = chamberId, postal_address, name" << std::endl
            << "        self.status = \"NOFIT\"" << std::endl
            << "        self.fittype = None" << std::endl
+           << "        self.CovMatrix = None" << std::endl
            << "" << std::endl
            << "    def add_parameters(self, deltax, deltay, deltaz, deltaphix, deltaphiy, deltaphiz, loglikelihood, "
               "numsegments, sumofweights, redchi2):"
@@ -901,7 +965,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
   for (const auto& ali : m_alignables) {
     if (m_debug)
       std::cout << "***** Start loop over alignables" << std::endl;
-
     std::vector<bool> selector = ali->alignmentParameters()->selector();
     bool align_x = selector[0];
     bool align_y = selector[1];
@@ -909,9 +972,26 @@ void MuonAlignmentFromReference::fitAndAlign() {
     bool align_phix = selector[3];
     bool align_phiy = selector[4];
     bool align_phiz = selector[5];
+    DetId id_check = ali->geomDetId();
+    //If it is sector 4,13,10,14 of station4 in DT I will not align phiY, because these sectors are non pointing and their redisual is biased.
+    bool WannaUsenoPHIY = false;
+    if (id_check.subdetId() == MuonSubdetId::DT) {
+      DTChamberId chamberId_check(id_check.rawId());
+      if (chamberId_check.station() == 4 && (chamberId_check.sector() == 10 || chamberId_check.sector() == 13 ||
+                                             chamberId_check.sector() == 4 || chamberId_check.sector() == 14))
+        WannaUsenoPHIY = true;
+    }
+    // In ME1/3 aligning Y give a large spread on Y. So we fix Y.
+    bool WannaUsenoY = false;
+    if (id_check.subdetId() == MuonSubdetId::CSC) {
+      CSCDetId chamberId_check(id_check.rawId());
+      if (chamberId_check.station() == 1 && chamberId_check.ring() == 3)
+        WannaUsenoY = true;
+    }
+
+    //Counting the parameters
     int numParams = ((align_x ? 1 : 0) + (align_y ? 1 : 0) + (align_z ? 1 : 0) + (align_phix ? 1 : 0) +
                      (align_phiy ? 1 : 0) + (align_phiz ? 1 : 0));
-
     // map from 0-5 to the index of params, above
     std::vector<int> paramIndex;
     int paramIndex_counter = -1;
@@ -933,11 +1013,13 @@ void MuonAlignmentFromReference::fitAndAlign() {
     if (align_phiz)
       paramIndex_counter++;
     paramIndex.push_back(paramIndex_counter);
-
     DetId id = ali->geomDetId();
 
     auto thisali = ali;
-    if (m_combineME11 && id.subdetId() == MuonSubdetId::CSC) {
+    if (m_combineME11 &&
+        id.subdetId() ==
+            MuonSubdetId::
+                CSC) {  // ME 1/1 and ME 1/4 are the same chambers but are divided. here you are fitting them as a single chamber.
       CSCDetId cscid(id.rawId());
       if (cscid.station() == 1 && cscid.ring() == 4)
         thisali = m_me11map[ali];
@@ -968,8 +1050,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
               chamberId.ring(),
               chamberId.chamber());
 
-      //if ( chamberId.chamber()>6 || chamberId.endcap()==2 || ! ( (chamberId.station()==2&&chamberId.ring()==1) || (chamberId.station()==3&&chamberId.ring()==2) ) ) continue;
-
       if (writeReport) {
         report << "reports.append(Report(" << id.rawId() << ", (\"CSC\", " << chamberId.endcap() << ", "
                << chamberId.station() << ", " << chamberId.ring() << ", " << chamberId.chamber() << "), \"" << cname
@@ -979,17 +1059,12 @@ void MuonAlignmentFromReference::fitAndAlign() {
 
     if (m_debug)
       std::cout << "***** loop over alignables 2" << std::endl;
-
-    //if(! ( strcmp(cname,"MBwhCst3sec12")==0 || strcmp(cname,"MBwhCst3sec06")==0)) continue;
-
     std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator fitter = m_fitters.find(thisali);
 
     if (m_debug)
       std::cout << "***** loop over alignables 3" << std::endl;
 
     if (fitter != m_fitters.end()) {
-      //if (fitter->second->type() != MuonResidualsFitter::k6DOFrphi) continue;
-
       TStopwatch stop_watch;
       stop_watch.Start();
 
@@ -1004,7 +1079,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
         report << "reports[-1].posNum = " << fitter->second->numResidualsPos() << std::endl;
         report << "reports[-1].negNum = " << fitter->second->numResidualsNeg() << std::endl;
       }
-
       if (fitter->second->type() == MuonResidualsFitter::k5DOF) {
         if (!align_x)
           fitter->second->fix(MuonResiduals5DOFFitter::kAlignX);
@@ -1012,10 +1086,13 @@ void MuonAlignmentFromReference::fitAndAlign() {
           fitter->second->fix(MuonResiduals5DOFFitter::kAlignZ);
         if (!align_phix)
           fitter->second->fix(MuonResiduals5DOFFitter::kAlignPhiX);
-        if (!align_phiy)
+        // Not aligning PhiY in BAD sectors (station 4 sectro 3 4 10 14)
+        if (!align_phiy || WannaUsenoPHIY)
           fitter->second->fix(MuonResiduals5DOFFitter::kAlignPhiY);
         if (!align_phiz)
           fitter->second->fix(MuonResiduals5DOFFitter::kAlignPhiZ);
+        // It was a test to fix sigma to post-fit value (but it gives the same results). Also MuonAlignmentAlgorithms/src/MuonResidualsFitter.cc was changed
+        //fitter->second->fix(MuonResiduals5DOFFitter::kResidSigma);
       } else if (fitter->second->type() == MuonResidualsFitter::k6DOF) {
         if (!align_x)
           fitter->second->fix(MuonResiduals6DOFFitter::kAlignX);
@@ -1029,10 +1106,13 @@ void MuonAlignmentFromReference::fitAndAlign() {
           fitter->second->fix(MuonResiduals6DOFFitter::kAlignPhiY);
         if (!align_phiz)
           fitter->second->fix(MuonResiduals6DOFFitter::kAlignPhiZ);
+        // It was a test to fix sigma to post-fit value (but it gives the same results). Also MuonAlignmentAlgorithms/src/MuonResidualsFitter.cc was changed
+        //fitter->second->fix(MuonResiduals6DOFFitter::kResidXSigma);
+        //fitter->second->fix(MuonResiduals6DOFFitter::kResidYSigma);
       } else if (fitter->second->type() == MuonResidualsFitter::k6DOFrphi) {
         if (!align_x)
           fitter->second->fix(MuonResiduals6DOFrphiFitter::kAlignX);
-        if (!align_y)
+        if (!align_y || WannaUsenoY)
           fitter->second->fix(MuonResiduals6DOFrphiFitter::kAlignY);
         if (!align_z)
           fitter->second->fix(MuonResiduals6DOFrphiFitter::kAlignZ);
@@ -1047,28 +1127,23 @@ void MuonAlignmentFromReference::fitAndAlign() {
 
       if (m_debug)
         std::cout << "***** loop over alignables 4" << std::endl;
-
       AlgebraicVector params(numParams);
       AlgebraicSymMatrix cov(numParams);
 
       if (fitter->second->numsegments() >= m_minAlignmentHits) {
         if (m_debug)
           std::cout << "***** loop over alignables 5" << std::endl;
-
         bool successful_fit = fitter->second->fit(thisali);
 
         if (m_debug)
           std::cout << "***** loop over alignables 6 " << fitter->second->type() << std::endl;
-
         double loglikelihood = fitter->second->loglikelihood();
         double numsegments = fitter->second->numsegments();
         double sumofweights = fitter->second->sumofweights();
         double redchi2 = fitter->second->plot(cname, &rootDirectory, thisali);
-
         if (fitter->second->type() == MuonResidualsFitter::k5DOF) {
           if (m_debug)
             std::cout << "***** loop over alignables k5DOF" << std::endl;
-
           double deltax_value = fitter->second->value(MuonResiduals5DOFFitter::kAlignX);
           double deltax_error = fitter->second->errorerror(MuonResiduals5DOFFitter::kAlignX);
           double deltax_antisym = fitter->second->antisym(MuonResiduals5DOFFitter::kAlignX);
@@ -1101,7 +1176,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
               gammaresslope_antisym;
           gammaresid_value = gammaresid_error = gammaresid_antisym = gammaresslope_value = gammaresslope_error =
               gammaresslope_antisym = 0.;
-
           if (fitter->second->residualsModel() != MuonResidualsFitter::kPureGaussian &&
               fitter->second->residualsModel() != MuonResidualsFitter::kPureGaussian2D &&
               fitter->second->residualsModel() != MuonResidualsFitter::kGaussPowerTails) {
@@ -1113,7 +1187,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
             gammaresslope_error = fitter->second->errorerror(MuonResiduals5DOFFitter::kResSlopeGamma);
             gammaresslope_antisym = fitter->second->antisym(MuonResiduals5DOFFitter::kResSlopeGamma);
           }
-
           if (writeReport) {
             report << "reports[-1].fittype = \"5DOF\"" << std::endl;
             report << "reports[-1].add_parameters(ValErr(" << deltax_value << ", " << deltax_error << ", "
@@ -1166,6 +1239,15 @@ void MuonAlignmentFromReference::fitAndAlign() {
                    << "None, " << fitter->second->stdev(MuonResiduals5DOFFitter::kResSlope, 10.) << ", "
                    << "None)" << std::endl;
 
+            report << "reports[-1].CovMatrix = [";
+            for (int ii = 0; ii < 64; ii++) {
+              if (ii != 63)
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "',";
+              else
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "'";
+            }
+            report << "]" << std::endl;
+
             std::stringstream namesimple_x, namesimple_dxdz, nameweighted_x, nameweighted_dxdz;
             namesimple_x << cname << "_simple_x";
             namesimple_dxdz << cname << "_simple_dxdz";
@@ -1187,7 +1269,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
                                          MuonResiduals5DOFFitter::kRedChi2,
                                          1000.);
           }
-
           if (successful_fit) {
             if (align_x)
               params[paramIndex[0]] = deltax_value;
@@ -1343,6 +1424,15 @@ void MuonAlignmentFromReference::fitAndAlign() {
                    << fitter->second->stdev(MuonResiduals6DOFFitter::kResidY, 15.) << ", "
                    << fitter->second->stdev(MuonResiduals6DOFFitter::kResSlopeX, 10.) << ", "
                    << fitter->second->stdev(MuonResiduals6DOFFitter::kResSlopeY, 25.) << ")" << std::endl;
+
+            report << "reports[-1].CovMatrix = [";
+            for (int ii = 0; ii < 144; ii++) {
+              if (ii != 143)
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "',";
+              else
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "'";
+            }
+            report << "]" << std::endl;
 
             std::stringstream namesimple_x, namesimple_y, namesimple_dxdz, namesimple_dydz, nameweighted_x,
                 nameweighted_y, nameweighted_dxdz, nameweighted_dydz;
@@ -1509,6 +1599,15 @@ void MuonAlignmentFromReference::fitAndAlign() {
                    << "None, " << fitter->second->stdev(MuonResiduals6DOFrphiFitter::kResSlope, 10.) << ", "
                    << "None)" << std::endl;
 
+            report << "reports[-1].CovMatrix = [";
+            for (int ii = 0; ii < 81; ii++) {
+              if (ii != 143)
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "',";
+              else
+                report << "'" << fitter->second->CovMatr().GetMatrixArray()[ii] << "'";
+            }
+            report << "]" << std::endl;
+
             std::stringstream namesimple_x, namesimple_dxdz, nameweighted_x, nameweighted_dxdz;
             namesimple_x << cname << "_simple_x";
             namesimple_dxdz << cname << "_simple_dxdz";
@@ -1546,7 +1645,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
               params[paramIndex[5]] = deltaphiz_value;
           }
         }  // end if 6DOFrphi
-
         if (successful_fit) {
           align::Alignables oneortwo;
           oneortwo.push_back(ali);
@@ -1641,15 +1739,17 @@ void MuonAlignmentFromReference::readTmpFiles() {
 void MuonAlignmentFromReference::writeTmpFiles() {
   FILE* file;
   file = fopen(m_writeTemporaryFile.c_str(), "w");
-  int size = m_indexes.size();
-  fwrite(&size, sizeof(int), 1, file);
+  int size = m_indexes.size();          // m_indexes is a vector of int. Each int is the Raw ID of the chamber.
+  fwrite(&size, sizeof(int), 1, file);  //WRITE the size of m_indexes
 
   int i = 0;
   for (std::vector<unsigned int>::const_iterator index = m_indexes.begin(); index != m_indexes.end(); ++index, ++i) {
     MuonResidualsTwoBin* fitter = m_fitterOrder[*index];
     unsigned int index_towrite = *index;
-    fwrite(&index_towrite, sizeof(unsigned int), 1, file);
-    fitter->write(file, i);
+    fwrite(&index_towrite, sizeof(unsigned int), 1, file);  // WRITE the RAW_ID of the chamber (one by one)
+    fitter->write(
+        file,
+        i);  //All the other informations are written inside this method (you just need the file and the index to the element to write)
   }
 
   fclose(file);
@@ -1671,7 +1771,7 @@ void MuonAlignmentFromReference::fiducialCuts() {
     if (m_debug)
       std::cout << "applying fiducial cuts in " << chamberPrettyNameFromId(*index) << std::endl;
     MuonResidualsTwoBin* fitter = m_fitterOrder[*index];
-    fitter->fiducialCuts();
+    fitter->fiducialCuts(*index);
   }
 }
 
@@ -1812,6 +1912,9 @@ void MuonAlignmentFromReference::fillNtuple() {
         m_tree_row.pz = (Float_t)(*residual)[MuonResiduals5DOFFitter::kPz];
         m_tree_row.pt = (Float_t)(*residual)[MuonResiduals5DOFFitter::kPt];
         m_tree_row.q = (Char_t)(*residual)[MuonResiduals5DOFFitter::kCharge];
+        m_tree_row.OccuWeight = (fitter->type() == MuonResidualsFitter::k5DOF)
+                                    ? (Float_t)(*residual)[MuonResiduals5DOFFitter::kWeightOccupancy]
+                                    : -1.;  // for CSC you do not have this element in the array
         m_tree_row.select = (Bool_t)*residual_ok;
       } else if (fitter->type() == MuonResidualsFitter::k6DOF) {
         m_tree_row.res_x = (Float_t)(*residual)[MuonResiduals6DOFFitter::kResidX];
@@ -1825,10 +1928,10 @@ void MuonAlignmentFromReference::fillNtuple() {
         m_tree_row.pz = (Float_t)(*residual)[MuonResiduals6DOFFitter::kPz];
         m_tree_row.pt = (Float_t)(*residual)[MuonResiduals6DOFFitter::kPt];
         m_tree_row.q = (Char_t)(*residual)[MuonResiduals6DOFFitter::kCharge];
+        m_tree_row.OccuWeight = (Float_t)(*residual)[MuonResiduals6DOFFitter::kWeightOccupancy];
         m_tree_row.select = (Bool_t)*residual_ok;
       } else
         assert(false);
-
       m_ttree->Fill();
     }
   }

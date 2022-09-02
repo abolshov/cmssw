@@ -113,17 +113,6 @@ TransientTrackingRecHit::ConstRecHitContainer TrackTransformer::getTransientRecH
     if ((*hit)->isValid()) {
       if ((*hit)->geographicalId().det() == DetId::Tracker) {
         result.emplace_back((**hit).cloneForFit(*tkbuilder->geometry()->idToDet((**hit).geographicalId())));
-      } else if ((*hit)->geographicalId().det() == DetId::Muon) {
-        if ((*hit)->geographicalId().subdetId() == 3 && !theRPCInTheFit) {
-          LogTrace("Reco|TrackingTools|TrackTransformer") << "RPC Rec Hit discarged";
-          continue;
-        }
-        result.push_back(theMuonRecHitBuilder->build(&**hit));
-      } else if ((*hit)->geographicalId().det() == DetId::Forward && (*hit)->geographicalId().subdetId() == FastTime) {
-        if (theMtdAvailable)
-          result.push_back(theMTDRecHitBuilder->build(&**hit));
-        else
-          throw cms::Exception("TrackTransformer") << "MTD hit encountered but MTD not available!";
       }
     }
   }
@@ -293,6 +282,38 @@ vector<Trajectory> TrackTransformer::transform(const reco::TransientTrack& track
   if (trajectoriesSM.empty()) {
     LogTrace(metname) << "No Track smoothed!" << endl;
   }
+  if (trajectoriesSM.empty()) {
+    return trajectoriesSM;
+  } else {
+    Trajectory trajectoryFW2 = trajectoriesSM.front();
+    trajectoryFW2.reverse();
+    auto const& trajectories2 =
+        theFitter->fit(trajectoryFW2.seed(), trajectoryFW2.recHits(), trajectoryFW2.geometricalInnermostState());
+    if (trajectories2.empty()) {
+      LogTrace(metname) << "No Track refitted!" << endl;
+      return trajectories2;
+    }
 
-  return trajectoriesSM;
+    auto const& trajectoryBW2 = trajectories2.front();
+    auto const& trajectoriesSM2 = theSmoother->trajectories(trajectoryBW2);
+    if (trajectoriesSM2.empty()) {
+      LogTrace(metname) << "No Track smoothed!" << endl;
+      return trajectoriesSM2;
+    } else {
+      Trajectory trajectoryFW3 = trajectoriesSM2.front();
+      trajectoryFW3.reverse();
+      auto const& trajectories3 =
+          theFitter->fit(trajectoryFW3.seed(), trajectoryFW3.recHits(), trajectoryFW3.geometricalInnermostState());
+      if (trajectories3.empty()) {
+        LogTrace(metname) << "No Track refitted!" << endl;
+        return trajectories3;
+      }
+      auto const& trajectoryBW3 = trajectories3.front();
+      auto const& trajectoriesSM3 = theSmoother->trajectories(trajectoryBW3);
+      if (trajectoriesSM3.empty()) {
+        LogTrace(metname) << "No Track smoothed!" << endl;
+      }
+      return trajectoriesSM3;
+    }
+  }
 }

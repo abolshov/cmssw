@@ -46,7 +46,6 @@ public:
 private:
   // es token
   const edm::ESGetToken<GlobalTrackingGeometry, GlobalTrackingGeometryRecord> m_esTokenGBTGeom;
-  const edm::ESGetToken<DetIdAssociator, DetIdAssociatorRecord> m_esTokenDetId;
   const edm::ESGetToken<Propagator, TrackingComponentsRecord> m_esTokenProp;
   const edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> m_esTokenMF;
   const MuonResidualsFromTrack::BuilderToken m_esTokenBuilder;
@@ -86,7 +85,6 @@ AlignmentMonitorMuonVsCurvature::AlignmentMonitorMuonVsCurvature(const edm::Para
                                                                  edm::ConsumesCollector iC)
     : AlignmentMonitorBase(cfg, iC, "AlignmentMonitorMuonVsCurvature"),
       m_esTokenGBTGeom(iC.esConsumes()),
-      m_esTokenDetId(iC.esConsumes(edm::ESInputTag("", "MuonDetIdAssociator"))),
       m_esTokenProp(iC.esConsumes(edm::ESInputTag("", "SteppingHelixPropagatorAny"))),
       m_esTokenMF(iC.esConsumes()),
       m_esTokenBuilder(iC.esConsumes(MuonResidualsFromTrack::builderESInputTag())),
@@ -200,7 +198,6 @@ void AlignmentMonitorMuonVsCurvature::event(const edm::Event &iEvent,
   iEvent.getByLabel(m_beamSpotTag, beamSpot);
 
   const GlobalTrackingGeometry *globalGeometry = &iSetup.getData(m_esTokenGBTGeom);
-  const DetIdAssociator *muonDetIdAssociator_ = &iSetup.getData(m_esTokenDetId);
   const Propagator *prop = &iSetup.getData(m_esTokenProp);
   const MagneticField *magneticField = &iSetup.getData(m_esTokenMF);
   auto builder = iSetup.getHandle(m_esTokenBuilder);
@@ -214,7 +211,7 @@ void AlignmentMonitorMuonVsCurvature::event(const edm::Event &iEvent,
 
       if (track->pt() > m_minTrackPt && track->p() > m_minTrackP && fabs(track->dxy(beamSpot->position())) < m_maxDxy) {
         MuonResidualsFromTrack muonResidualsFromTrack(
-            builder, magneticField, globalGeometry, muonDetIdAssociator_, prop, traj, track, pNavigator(), 1000.);
+            builder, magneticField, globalGeometry, prop, traj, track, pNavigator(), 1000.);
         processMuonResidualsFromTrack(muonResidualsFromTrack, traj);
       }  // end if track pT is within range
     }    // end loop over tracks

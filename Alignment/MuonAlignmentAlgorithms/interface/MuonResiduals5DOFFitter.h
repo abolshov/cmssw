@@ -33,21 +33,22 @@ public:
 
   enum {
     kResid = 0,
-    kResSlope,
-    kPositionX,
-    kPositionY,
-    kAngleX,
-    kAngleY,
-    kRedChi2,
-    kPz,
-    kPt,
-    kCharge,
-    kStation,
-    kWheel,
-    kSector,
-    kChambW,
-    kChambl,
-    kNData
+    kResSlope = 1,
+    kPositionX = 2,
+    kPositionY = 3,
+    kAngleX = 4,
+    kAngleY = 5,
+    kRedChi2 = 6,
+    kPz = 7,
+    kPt = 8,
+    kCharge = 9,
+    kStation = 10,
+    kWheel = 11,
+    kSector = 12,
+    kChambW = 13,
+    kChambl = 14,
+    kWeightOccupancy = 16,
+    kNData = 17
   };
 
   MuonResiduals5DOFFitter(int residualsModel, int minHits, int useResiduals, bool weightAlignment = true)
