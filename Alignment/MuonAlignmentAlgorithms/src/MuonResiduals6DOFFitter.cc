@@ -435,7 +435,16 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
     low.push_back(lows[idx[i]]);
     high.push_back(highs[idx[i]]);
   }
+
   DTChamberId myid(ali->geomDetId().rawId());
+  // std::cout << "myid = " << myid << "; " << "num.size() = " << num.size() << std::endl;
+  // std::cout << "name.size() = " << name.size() << std::endl;
+  // for (auto str: name) {
+  //     std::cout << str << std::endl;
+  // }
+  // std::cout << "ni = " << ni << std::endl;
+  // std::cout << "start.size() = " << start.size() << std::endl;
+  // std::cout << "step.size() = " << step.size() << std::endl;
   int wheel = myid.wheel(), station = myid.station(), sector = myid.sector();
   std::string chmamber_id = std::to_string(wheel) + "_" + std::to_string(station) + "_" + std::to_string(sector);
   return dofit(&MuonResiduals6DOFFitter_FCN, num, name, start, step, low, high, chmamber_id);
