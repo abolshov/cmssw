@@ -368,7 +368,8 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
   bool add_gamma = (residualsModel() == kROOTVoigt || residualsModel() == kPowerLawTails);
 
   int idx[8], ni = 0;
-  if (useRes() == k1111) {
+  if (useRes() == k1111) 
+  {
     for (ni = 0; ni < 4; ni++)
       idx[ni] = ni + 6;
     if (add_alpha)
@@ -381,7 +382,9 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
       fix(kAlphaX);
     if (!add_alpha)
       fix(kAlphaY);
-  } else if (useRes() == k1110) {
+  } 
+  else if (useRes() == k1110) 
+  {
     for (ni = 0; ni < 3; ni++)
       idx[ni] = ni + 6;
     if (add_alpha)
@@ -390,10 +393,13 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
       for (; ni < 6; ni++)
         idx[ni] = ni + 9;
     fix(kResSlopeYSigma);
+    std::cout << "checkpoint 1\n";
     fix(kAlphaY);
     if (!add_alpha)
       fix(kAlphaX);
-  } else if (useRes() == k1100) {
+  } 
+  else if (useRes() == k1100) 
+  {
     for (ni = 0; ni < 2; ni++)
       idx[ni] = ni + 6;
     if (add_gamma)
@@ -401,9 +407,12 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
         idx[ni] = ni + 10;
     fix(kResSlopeXSigma);
     fix(kResSlopeYSigma);
+    std::cout << "checkpoint 2\n";
     fix(kAlphaX);
     fix(kAlphaY);
-  } else if (useRes() == k1010) {
+  } 
+  else if (useRes() == k1010) 
+  {
     idx[ni++] = 6;
     idx[ni++] = 8;
     if (add_alpha)
@@ -414,16 +423,20 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
     }
     fix(kResidYSigma);
     fix(kResSlopeYSigma);
+    std::cout << "checkpoint 3\n";
     fix(kAlphaY);
     if (!add_alpha)
       fix(kAlphaX);
-  } else if (useRes() == k0010) {
+  } 
+  else if (useRes() == k0010) 
+  {
     idx[ni++] = 8;
     if (add_gamma)
       idx[ni++] = 14;
     fix(kResidXSigma);
     fix(kResidYSigma);
     fix(kResSlopeYSigma);
+    std::cout << "checkpoint 4\n";
     fix(kAlphaX);
     fix(kAlphaY);
   }
@@ -437,6 +450,11 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
   }
 
   DTChamberId myid(ali->geomDetId().rawId());
+  int wheel = myid.wheel(), station = myid.station(), sector = myid.sector();
+  std::cout << "----------------------------\n";
+  std::cout << "chamber " << wheel << "/" << station << "/" << sector << "; fixed(kResSlopeYSigma) = " << fixed(kResSlopeYSigma) << std::endl;
+  std::cout << "----------------------------\n";
+
   // std::cout << "myid = " << myid << "; " << "num.size() = " << num.size() << std::endl;
   // std::cout << "name.size() = " << name.size() << std::endl;
   // for (auto str: name) {
@@ -445,7 +463,7 @@ bool MuonResiduals6DOFFitter::fit(Alignable *ali) {
   // std::cout << "ni = " << ni << std::endl;
   // std::cout << "start.size() = " << start.size() << std::endl;
   // std::cout << "step.size() = " << step.size() << std::endl;
-  int wheel = myid.wheel(), station = myid.station(), sector = myid.sector();
+  
   std::string chmamber_id = std::to_string(wheel) + "_" + std::to_string(station) + "_" + std::to_string(sector);
   return dofit(&MuonResiduals6DOFFitter_FCN, num, name, start, step, low, high, chmamber_id);
 }
