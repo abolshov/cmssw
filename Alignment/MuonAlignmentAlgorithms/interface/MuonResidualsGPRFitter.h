@@ -86,10 +86,10 @@ public:
         kAlignPhiX,
         kAlignPhiY,
         kAlignPhiZ,
-        kResidXSigma,
-        kResidYSigma,
-        kResSlopeXSigma,
-        kResSlopeYSigma,
+        // kResidXSigma,
+        // kResidYSigma,
+        // kResSlopeXSigma,
+        // kResSlopeYSigma,
         kCount // needed to count number of minuit parameters
     };
 
@@ -119,6 +119,9 @@ public:
     // methods returning widths of residual distributions
     std::vector<double> const& getResWidths(DetId detId) const { return m_resWidths.find(detId)->second; }
 
+    // enumeration for better accessing widths in return values of function above
+    enum class ResidSigTypes { kResXSigma, kResYSigma, kResXslopeSigma, kResYslopeSigma };
+
     // method filling pairs (or const_iterator) to m_datamap
     void fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it);
 
@@ -131,23 +134,12 @@ public:
     //returns param error
     double getParamError(int index) const { return m_error.at(index); }
 
-    // returns covariance matrix
-    // TMatrixDSym getCovarianceMatrix() const { return m_cov; }
-
-    // returns element of covariance matrix
-    // double getCovarianceElem(int idx1, int idx2);
-
-    // returns correlation matrix
-    // TMatrixDSym getCorrelationMatrix();
-
     // dt geometry getter
     DTGeometry const* getDTGeometry() const { return m_gpr_dtGeometry; }
 
-    void scan_FCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
+    void scanFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
 
-    // function which is called to do a fit on a set of alignables
-    // implement version of this function to be able to fit a subset of DT system
-    // wrapper-function only preparing stuff for dofit
+    // wrapper-function for only configuring and preparing parameters passed to dofit
     bool fit();
 
 private:
@@ -164,7 +156,7 @@ private:
     int m_strategy;
     // bool m_weightAlignment;
 
-    // ? for MINUIT's output ?
+    // for MINUIT's output 
     std::vector<double> m_value;
     std::vector<double> m_error;
     // TMatrixDSym m_cov;
@@ -189,10 +181,10 @@ private:
 class MuonResidualsGPRFitterFitInfo : public TObject {
 public:
     MuonResidualsGPRFitterFitInfo(MuonResidualsGPRFitter *gpr_fitter) : m_gpr_fitter(gpr_fitter) {}
-    MuonResidualsGPRFitter *gpr_fitter() { return m_gpr_fitter; } // is needed to get access to gpr fitter object in likelihod calc
+    MuonResidualsGPRFitter* gpr_fitter() { return m_gpr_fitter; } // is needed to get access to gpr fitter object in likelihod calc
 
 private:
-    MuonResidualsGPRFitter *m_gpr_fitter;
+    MuonResidualsGPRFitter* m_gpr_fitter;
 #ifdef STANDALONE_FITTER
     ClassDef(MuonResidualsGPRFitterFitInfo, 1);
 #endif
