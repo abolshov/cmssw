@@ -178,6 +178,7 @@ private:
 
   // DT geometry
   DTGeometry const* m_dtGeometry;
+  CSCGeometry const* m_cscGeometry;
   // std::map<DetId, std::vector<double>> m_ResidWidths;
 
   //Layer Plots
@@ -461,6 +462,7 @@ void MuonAlignmentFromReference::initialize(const edm::EventSetup& iSetup,
 
   const CSCGeometry* cscGeometry = &iSetup.getData(m_cscGeometryToken);
   m_dtGeometry = &iSetup.getData(m_dtGeometryToken);
+  m_cscGeometry = cscGeometry;
 
   // set up the MuonResidualsFitters (which also collect residuals for fitting)
   m_me11map.clear();
@@ -2036,34 +2038,31 @@ void MuonAlignmentFromReference::test()
 
 void MuonAlignmentFromReference::doGlobalAlignment()
 {
-  // std::cout << "Succesfully entered doGlobalAlignment\n";
-
   double resx_std = 0.5;
   double resy_std = 1.0;
   double resslopex_std = 0.002;
   double resslopey_std = 0.005;
 
-
-  std::map<Alignable*, MuonResidualsTwoBin*> dts;
+  std::map<Alignable*, MuonResidualsTwoBin*> chambers;
   std::map<DetId, std::vector<double>> sigmas;
   std::vector<double> sigmas_std{ resx_std, resy_std, resslopex_std, resslopey_std };
   // Tracer::instance() << "Positions of chambers in global frame before any alignment:\n";
   for (auto const& ali: m_alignables) 
   {
-      DetId id = ali->geomDetId();
-      if (id.subdetId() == MuonSubdetId::DT)
-      {
-        DTChamberId dtId(id.rawId());
-        std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it = m_fitters.find(ali);
-        dts.insert(*it);
-        sigmas[id] = sigmas_std;
-        // align::RotationType const& orientation = ali->globalRotation();
-        // align::PositionType const& position = ali->globalPosition();
-        // Tracer::instance() << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-        // Tracer::instance() << orientation << "\n";
-        // Tracer::instance() << position << "\n";
-        // Tracer::instance() << "--------------------------------------" << "\n";
-      }
+    DetId id = ali->geomDetId();
+    if (id.subdetId() == MuonSubdetId::DT)
+    {
+      DTChamberId dtId(id.rawId());
+      std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it = m_fitters.find(ali);
+      chambers.insert(*it);
+      sigmas[id] = sigmas_std;
+      // align::RotationType const& orientation = ali->globalRotation();
+      // align::PositionType const& position = ali->globalPosition();
+      // Tracer::instance() << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
+      // Tracer::instance() << orientation << "\n";
+      // Tracer::instance() << position << "\n";
+      // Tracer::instance() << "--------------------------------------" << "\n";
+    }
   }
 
   // for (auto& item: sigmas)
@@ -2076,7 +2075,11 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   //   std::transform(item.second.begin(), item.second.end(), sigmas_std.begin(), item.second.begin(), rule);
   // }
 
-  m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, dts, sigmas);
+  // m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, dts, sigmas);
+
+  m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, chambers, sigmas);
+  m_gpr_fitter.SetData(m_fitters);
+  m_gpr_fitter.SetCSCGeometry(m_cscGeometry);
   using namespace std::chrono;
 
   std::ofstream file;
