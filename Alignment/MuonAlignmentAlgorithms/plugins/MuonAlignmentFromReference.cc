@@ -2077,9 +2077,10 @@ void MuonAlignmentFromReference::doGlobalAlignment()
 
   // m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, dts, sigmas);
 
-  m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, chambers, sigmas);
+  // m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, chambers, sigmas);
   m_gpr_fitter.SetData(m_fitters);
-  m_gpr_fitter.SetCSCGeometry(m_cscGeometry);
+  if (m_doCSC) m_gpr_fitter.SetCSCGeometry(m_cscGeometry);
+  if (m_doDT) m_gpr_fitter.SetDTGeometry(m_dtGeometry);
   using namespace std::chrono;
 
   std::ofstream file;
@@ -2089,7 +2090,7 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   // m_gpr_fitter.scanFCN(50, lows, highs);
 
   auto start = high_resolution_clock::now();
-  bool gpr_fit_done = m_gpr_fitter.fit();
+  bool gpr_fit_done = m_gpr_fitter.Fit();
   auto stop = high_resolution_clock::now();
   auto duration = duration_cast<milliseconds>(stop - start);
   // bool gpr_fit_done = false;
@@ -2102,8 +2103,8 @@ void MuonAlignmentFromReference::doGlobalAlignment()
     file << "dx,dy,dz,dphix,dphiy,dphiz\n";
     for (size_t i = 0; i < 6; ++i)
     {
-      Tracer::instance() << m_gpr_fitter.getParamValue(i) << " ";
-      file << m_gpr_fitter.getParamValue(i) << ",";
+      Tracer::instance() << m_gpr_fitter.GetParamValue(i) << " ";
+      file << m_gpr_fitter.GetParamValue(i) << ",";
     }
     file << std::endl;
     Tracer::instance() << "\n";

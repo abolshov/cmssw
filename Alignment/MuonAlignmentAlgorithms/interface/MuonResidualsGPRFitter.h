@@ -114,27 +114,14 @@ public:
         kCount // needed to count number of minuit parameters
     };
 
-    MuonResidualsGPRFitter() = default;
-
-    MuonResidualsGPRFitter(DTGeometry const* dtGeometry, CSCGeometry const* cscGeometry,
-                           std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                           std::map<DetId, std::vector<double>> const& reswidths);
-
-    MuonResidualsGPRFitter(CSCGeometry const* cscGeometry,
-                           std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                           std::map<DetId, std::vector<double>> const& reswidths);
-                        
-    MuonResidualsGPRFitter(DTGeometry const* dtGeometry,
-                           std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                           std::map<DetId, std::vector<double>> const& reswidths);
-
+    MuonResidualsGPRFitter(DTGeometry const* dtGeometry = nullptr, CSCGeometry const* cscGeometry = nullptr);
     ~MuonResidualsGPRFitter() = default;
 
-    inline void setPrintLevel(int printLevel) { m_printLevel = printLevel; }
-    inline void setStrategy(int strategy) { m_strategy = strategy; }
+    inline void SetPrintLevel(int printLevel) { m_printLevel = printLevel; }
+    inline void SetStrategy(int strategy) { m_strategy = strategy; }
 
     // set residual distrubion widths 
-    inline void setResWidths(std::map<DetId, std::vector<double>>& sigmas) { m_resWidths = sigmas; }
+    inline void SetResWidths(std::map<DetId, std::vector<double>>& sigmas) { m_resWidths = sigmas; }
 
     inline double loglikelihood() const { return m_loglikelihood; }
 
@@ -156,35 +143,29 @@ public:
     inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; }
 
     //returns number of all residuals
-    inline int getSize() const { return m_datamap.size(); }
+    inline size_t Size() const { return m_datamap.size(); }
 
     //returns GPR parameter by given index
-    inline double getParamValue(int index) const { return m_value.at(index); }
+    inline double GetParamValue(int index) const { return m_value.at(index); }
 
     //returns param error
-    inline double getParamError(int index) const { return m_error.at(index); }
+    inline double GetParamError(int index) const { return m_error.at(index); }
 
     // geometry get/set
-    inline DTGeometry const* getDTGeometry() const { return m_DTGeometry; }
+    inline DTGeometry const* GetDTGeometry() const { return m_DTGeometry; }
     inline void SetDTGeometry(DTGeometry const* dtGeometry) { m_DTGeometry = dtGeometry; }
-    inline CSCGeometry const* getCSCGeometry() const { return m_CSCGeometry; }
+    inline CSCGeometry const* GetCSCGeometry() const { return m_CSCGeometry; }
     inline void SetCSCGeometry(CSCGeometry const* cscGeometry) { m_CSCGeometry = cscGeometry; }
 
     void scanFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
 
     // wrapper-function for only configuring and preparing parameters passed to dofit
-    bool fit();
+    bool Fit();
 
 private:
     // pointer to DT geometry to access methods for coordinate conversion in FCN
     DTGeometry const* m_DTGeometry;
     CSCGeometry const* m_CSCGeometry;
-    
-    // map store all pairs alignable chamber - TwoBin with residuals for this chamber
-    std::map<Alignable*, MuonResidualsTwoBin*> m_datamap;
-
-    // widths of residual distributions
-    std::map<DetId, std::vector<double>> m_resWidths;
 
     int m_printLevel;
     int m_strategy;
@@ -195,6 +176,12 @@ private:
     std::vector<double> m_error;
     // TMatrixDSym m_cov;
     double m_loglikelihood;
+
+    // map store all pairs alignable chamber - TwoBin with residuals for this chamber
+    std::map<Alignable*, MuonResidualsTwoBin*> m_datamap;
+
+    // widths of residual distributions
+    std::map<DetId, std::vector<double>> m_resWidths;
 
     void inform(TMinuit *tMinuit); // add this later
 

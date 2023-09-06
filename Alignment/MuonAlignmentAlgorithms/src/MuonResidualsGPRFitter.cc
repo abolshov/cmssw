@@ -35,7 +35,6 @@
 static TMinuit* MuonResidualsGPRFitter_TMinuit;
 
 static double avg_call_duration = 0.0f;
-static int iterate_calls = 0;
 static int FCN_calls = 0;
 static int dofit_calls = 0;
 
@@ -153,39 +152,9 @@ double MuonResidualsGPRFitter_logPureGaussian(double residual, double center, do
     return (-pow(residual - center, 2) * 0.5 / sigma / sigma) - cgaus - log(sigma);
 }
 
-MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* dtGeometry, CSCGeometry const* cscGeometry,
-                                               std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                                               std::map<DetId, std::vector<double>> const& reswidths)
+MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* dtGeometry, CSCGeometry const* cscGeometry)
     : m_DTGeometry(dtGeometry),
       m_CSCGeometry(cscGeometry),
-      m_datamap(datamap),
-      m_resWidths(reswidths),
-      m_printLevel(0),
-      m_strategy(2),
-      m_value(npar(), 0.0),
-      m_error(npar(), 0.0),
-      m_loglikelihood(0.0) {}
-
-MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* dtGeometry, 
-                                               std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                                               std::map<DetId, std::vector<double>> const& reswidths)
-    : m_DTGeometry(dtGeometry),
-      m_CSCGeometry(nullptr),
-      m_datamap(datamap),
-      m_resWidths(reswidths),
-      m_printLevel(0),
-      m_strategy(2),
-      m_value(npar(), 0.0),
-      m_error(npar(), 0.0),
-      m_loglikelihood(0.0) {}
-
-MuonResidualsGPRFitter::MuonResidualsGPRFitter(CSCGeometry const* cscGeometry,
-                                               std::map<Alignable*, MuonResidualsTwoBin*> const& datamap,
-                                               std::map<DetId, std::vector<double>> const& reswidths)
-    : m_DTGeometry(nullptr),
-      m_CSCGeometry(cscGeometry),
-      m_datamap(datamap),
-      m_resWidths(reswidths),
       m_printLevel(0),
       m_strategy(2),
       m_value(npar(), 0.0),
@@ -204,16 +173,13 @@ void MuonResidualsGPRFitter::Fill(std::map<Alignable*, MuonResidualsTwoBin*>::co
 //FCN is fed to minuit; this is the function being minimized, i.e. log likelihood
 void MuonResidualsGPRFitter_FCN(int &npar, double *gin, double &fval, double *par, int iflag) 
 {
-    // std::cout << "checkpoint 1\n";
     MuonResidualsGPRFitterFitInfo *fitinfo = (MuonResidualsGPRFitterFitInfo *)(minuit->GetObjectFit());
     MuonResidualsGPRFitter *gpr_fitter = fitinfo->gpr_fitter();
-    DTGeometry const* DTgeom = gpr_fitter->getDTGeometry();
-    CSCGeometry const* CSCgeom = gpr_fitter->getCSCGeometry();
-    // std::cout << "checkpoint 2\n";
-    // std::cout << gpr_fitter->getSize() << std::endl;
+    DTGeometry const* DTgeom = gpr_fitter->GetDTGeometry();
+    CSCGeometry const* CSCgeom = gpr_fitter->GetCSCGeometry();
+    
     fval = 0.0; // likelihood
     // loop over all chambers
-    iterate_calls = 0;
 
     using namespace std::chrono;
     auto start = high_resolution_clock::now();
@@ -223,9 +189,8 @@ void MuonResidualsGPRFitter_FCN(int &npar, double *gin, double &fval, double *pa
     {
         Alignable const* ali = chamber_data->first;
         DetId id = ali->geomDetId();
-        if (id.subdetId() == MuonSubdetId::DT) 
+        if (id.subdetId() == MuonSubdetId::DT && DTgeom) 
         {
-            // std::cout << "checkpoint 6\n";
             align::PositionType const& position = ali->globalPosition();
             align::RotationType const& orientation = ali->globalRotation();
 
@@ -307,7 +272,7 @@ void MuonResidualsGPRFitter_FCN(int &npar, double *gin, double &fval, double *pa
             }
         }
 
-        if (id.subdetId() == MuonSubdetId::CSC)
+        if (id.subdetId() == MuonSubdetId::CSC && CSCgeom)
         {
             align::PositionType const& position = ali->globalPosition();
             align::RotationType const& orientation = ali->globalRotation();
@@ -689,7 +654,7 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     return true;
 }
 
-bool MuonResidualsGPRFitter::fit()
+bool MuonResidualsGPRFitter::Fit()
 {
     std::vector<int> nums{ static_cast<int>(PARAMS::kAlignX),
                            static_cast<int>(PARAMS::kAlignY),
@@ -736,7 +701,7 @@ void MuonResidualsGPRFitter::scanFCN(int grid_size, std::vector<double> const& l
 {
     std::function<double(std::vector<double> const&)> fcn = [this](std::vector<double> const& parameters)
     {
-        DTGeometry const* geom = this->getDTGeometry();
+        DTGeometry const* geom = this->GetDTGeometry();
 
         int ndim = parameters.size();
         double* par = new double[ndim];
