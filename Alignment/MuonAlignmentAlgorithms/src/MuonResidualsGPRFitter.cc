@@ -229,11 +229,15 @@ void MuonResidualsGPRFitter_FCN(int &npar, double *gin, double &fval, double *pa
             double const alignphiz_l = locAngles[2]; 
 
             // widths of residual distributions; only use std values; possibly should be simplified
-            std::vector<double> resWidths = gpr_fitter->getResWidths(id);
-            double resXsigma = resWidths[static_cast<int>(ResidSigTypes::kResXSigma)];
-            double resYsigma = resWidths[static_cast<int>(ResidSigTypes::kResYSigma)];
-            double slopeXsigma = resWidths[static_cast<int>(ResidSigTypes::kResXslopeSigma)];
-            double slopeYsigma = resWidths[static_cast<int>(ResidSigTypes::kResYslopeSigma)];
+            // std::vector<double> resWidths = gpr_fitter->getResWidths(id);
+            // double resXsigma = resWidths[static_cast<int>(ResidSigTypes::kResXSigma)];
+            // double resYsigma = resWidths[static_cast<int>(ResidSigTypes::kResYSigma)];
+            // double slopeXsigma = resWidths[static_cast<int>(ResidSigTypes::kResXslopeSigma)];
+            // double slopeYsigma = resWidths[static_cast<int>(ResidSigTypes::kResYslopeSigma)];
+            double resXsigma = 0.5;
+            double resYsigma = 1.0;
+            double slopeXsigma = 0.002;
+            double slopeYsigma = 0.005;
 
             if (station != 4)
             {
@@ -697,7 +701,7 @@ bool MuonResidualsGPRFitter::Fit()
     return dofit(&MuonResidualsGPRFitter_FCN, nums, names, starts, steps, lows, highs);
 }
 
-void MuonResidualsGPRFitter::scanFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs)
+void MuonResidualsGPRFitter::PlotFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs)
 {
     std::function<double(std::vector<double> const&)> fcn = [this](std::vector<double> const& parameters)
     {

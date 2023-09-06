@@ -157,7 +157,7 @@ public:
     inline CSCGeometry const* GetCSCGeometry() const { return m_CSCGeometry; }
     inline void SetCSCGeometry(CSCGeometry const* cscGeometry) { m_CSCGeometry = cscGeometry; }
 
-    void scanFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
+    void PlotFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
 
     // wrapper-function for only configuring and preparing parameters passed to dofit
     bool Fit();

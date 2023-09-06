@@ -2065,19 +2065,6 @@ void MuonAlignmentFromReference::doGlobalAlignment()
     }
   }
 
-  // for (auto& item: sigmas)
-  // {
-  //   auto rule = [](double x, double y) 
-  //   {
-  //     if (x == 0.0) return y;
-  //     return x;
-  //   };
-  //   std::transform(item.second.begin(), item.second.end(), sigmas_std.begin(), item.second.begin(), rule);
-  // }
-
-  // m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, dts, sigmas);
-
-  // m_gpr_fitter = MuonResidualsGPRFitter(m_dtGeometry, chambers, sigmas);
   m_gpr_fitter.SetData(m_fitters);
   if (m_doCSC) m_gpr_fitter.SetCSCGeometry(m_cscGeometry);
   if (m_doDT) m_gpr_fitter.SetDTGeometry(m_dtGeometry);
@@ -2093,8 +2080,6 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   bool gpr_fit_done = m_gpr_fitter.Fit();
   auto stop = high_resolution_clock::now();
   auto duration = duration_cast<milliseconds>(stop - start);
-  // bool gpr_fit_done = false;
-
   if (gpr_fit_done)
   {
     Tracer::instance() << "Global Alignment done!" << "\n";
