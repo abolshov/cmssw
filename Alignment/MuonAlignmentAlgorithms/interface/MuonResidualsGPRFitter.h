@@ -53,15 +53,6 @@ public:
         kPositionY,
         kAngleX,
         kAngleY,
-        kRedChi2,
-        kPz,
-        kPt,
-        kCharge,
-        kStation,
-        kWheel,
-        kSector,
-        kChambW,
-        kChambl,
         kNData
     };
 
@@ -73,15 +64,6 @@ public:
         kPositionY,
         kAngleX,
         kAngleY,
-        kRedChi2,
-        kPz,
-        kPt,
-        kCharge,
-        kStation,
-        kWheel,
-        kSector,
-        kChambW,
-        kChambl,
         kNData
     };
 
@@ -93,10 +75,6 @@ public:
         kPositionY, 
         kAngleX, 
         kAngleY, 
-        kRedChi2, 
-        kPz, 
-        kPt, 
-        kCharge, 
         kNData
     };
 
@@ -107,15 +85,14 @@ public:
         kAlignPhiX,
         kAlignPhiY,
         kAlignPhiZ,
-        // kResidXSigma,
-        // kResidYSigma,
-        // kResSlopeXSigma,
-        // kResSlopeYSigma,
         kCount // needed to count number of minuit parameters
     };
 
-    MuonResidualsGPRFitter(DTGeometry const* dtGeometry = nullptr, CSCGeometry const* cscGeometry = nullptr);
-    ~MuonResidualsGPRFitter() = default;
+    MuonResidualsGPRFitter();
+    ~MuonResidualsGPRFitter();
+    // ~MuonResidualsGPRFitter() = default;
+
+    size_t NTypesOfResid(Alignable const* ali) const;
 
     inline void SetPrintLevel(int printLevel) { m_printLevel = printLevel; }
     inline void SetStrategy(int strategy) { m_strategy = strategy; }
@@ -131,6 +108,8 @@ public:
     // methods returning all residuals
     std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_begin() const { return m_datamap.begin(); }
     std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_end() const { return m_datamap.end(); }
+    // inline std::map<Alignable*, std::vector<double*>>::const_iterator ResidBegin() const { return m_data.cbegin(); }
+    // inline std::map<Alignable*, std::vector<double*>>::const_iterator ResidEnd() const { return m_data.cend(); }
 
     // methods returning widths of residual distributions
     inline std::vector<double> const& getResWidths(DetId detId) const { return m_resWidths.find(detId)->second; }
@@ -141,6 +120,7 @@ public:
     // method filling pairs (or const_iterator) to m_datamap
     void Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it);
     inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; }
+    void CopyData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap);
 
     //returns number of all residuals
     inline size_t Size() const { return m_datamap.size(); }
@@ -157,7 +137,10 @@ public:
     inline CSCGeometry const* GetCSCGeometry() const { return m_CSCGeometry; }
     inline void SetCSCGeometry(CSCGeometry const* cscGeometry) { m_CSCGeometry = cscGeometry; }
 
-    void PlotFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs);
+    void Print(size_t nValues, DetId id) const;
+    void PlotFCN(int grid_size = 50, 
+                 std::vector<double> const& lows = { -0.2, -0.2, -0.2, -0.02, -0.02, -0.02 }, 
+                 std::vector<double> const& highs = { 0.2, 0.2, 0.2, 0.02, 0.02, 0.02 }) const;
 
     // wrapper-function for only configuring and preparing parameters passed to dofit
     bool Fit();
@@ -179,6 +162,7 @@ private:
 
     // map store all pairs alignable chamber - TwoBin with residuals for this chamber
     std::map<Alignable*, MuonResidualsTwoBin*> m_datamap;
+    std::map<Alignable*, std::vector<double*>> m_data;
 
     // widths of residual distributions
     std::map<DetId, std::vector<double>> m_resWidths;
