@@ -105,11 +105,11 @@ public:
     //returns number of parameters to be fitted
     inline int npar() const { return static_cast<int>(PARAMS::kCount); }
 
-    // methods returning all residuals
+    // methods to access residuals
     std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_begin() const { return m_datamap.begin(); }
     std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_end() const { return m_datamap.end(); }
-    // inline std::map<Alignable*, std::vector<double*>>::const_iterator ResidBegin() const { return m_data.cbegin(); }
-    // inline std::map<Alignable*, std::vector<double*>>::const_iterator ResidEnd() const { return m_data.cend(); }
+    inline std::vector<double*>::const_iterator ResidualsBegin(Alignable* ali) const { return m_data.at(ali).cbegin(); }
+    inline std::vector<double*>::const_iterator ResidualsEnd(Alignable* ali) const { return m_data.at(ali).cend(); }
 
     // methods returning widths of residual distributions
     inline std::vector<double> const& getResWidths(DetId detId) const { return m_resWidths.find(detId)->second; }
@@ -121,6 +121,9 @@ public:
     void Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it);
     inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; }
     void CopyData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap);
+
+    // checks if chamber is seleced for alignment
+    bool Select(DetId id) const;
 
     //returns number of all residuals
     inline size_t Size() const { return m_datamap.size(); }
@@ -138,6 +141,7 @@ public:
     inline void SetCSCGeometry(CSCGeometry const* cscGeometry) { m_CSCGeometry = cscGeometry; }
 
     void Print(size_t nValues, DetId id) const;
+    void Print(size_t nValues, Alignable* ali) const;
     void PlotFCN(int grid_size = 50, 
                  std::vector<double> const& lows = { -0.2, -0.2, -0.2, -0.02, -0.02, -0.02 }, 
                  std::vector<double> const& highs = { 0.2, 0.2, 0.2, 0.02, 0.02, 0.02 }) const;
@@ -163,6 +167,13 @@ private:
     // map store all pairs alignable chamber - TwoBin with residuals for this chamber
     std::map<Alignable*, MuonResidualsTwoBin*> m_datamap;
     std::map<Alignable*, std::vector<double*>> m_data;
+
+    // encode which chambers to select for alignment
+    std::string m_DTWheels;
+    std::string m_DTStations;
+    std::string m_CSCEndcaps;
+    std::string m_CSCRings;
+    std::string m_CSCStations;
 
     // widths of residual distributions
     std::map<DetId, std::vector<double>> m_resWidths;

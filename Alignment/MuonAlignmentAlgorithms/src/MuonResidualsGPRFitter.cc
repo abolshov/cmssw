@@ -37,7 +37,6 @@ static TMinuit* MuonResidualsGPRFitter_TMinuit;
 
 static double avg_call_duration = 0.0f;
 static int FCN_calls = 0;
-static int dofit_calls = 0;
 
 using DT_6DOF = MuonResidualsGPRFitter::DataDT_6DOF;
 using DT_5DOF = MuonResidualsGPRFitter::DataDT_5DOF;
@@ -160,7 +159,12 @@ MuonResidualsGPRFitter::MuonResidualsGPRFitter()
       m_strategy(2),
       m_value(npar(), 0.0),
       m_error(npar(), 0.0),
-      m_loglikelihood(0.0) {}
+      m_loglikelihood(0.0),
+      m_DTWheels("00000"),
+      m_DTStations("0000"),
+      m_CSCEndcaps("01"),
+      m_CSCRings("100"),
+      m_CSCStations("0001") {}
 
 // if something happens comment out m_data, destructor and make it default
 MuonResidualsGPRFitter::~MuonResidualsGPRFitter()
@@ -400,7 +404,6 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
                                    std::vector<double> &low,
                                    std::vector<double> &high) 
 {
-    ++dofit_calls;
     MuonResidualsGPRFitterFitInfo *fitinfo = new MuonResidualsGPRFitterFitInfo(this);
 
     // configure Minuit object
@@ -1027,13 +1030,6 @@ void MuonResidualsGPRFitter::CopyData(std::map<Alignable*, MuonResidualsTwoBin*>
 
         // number type
         size_t numResTypes = NTypesOfResid(ali);
-        DetId id = ali->geomDetId();
-        if (id.subdetId() == MuonSubdetId::CSC)
-        {
-            CSCDetId cscId(id.rawId());
-            std::cout << cscId << std::endl;
-            std::cout << "Copying " << numResTypes << " kinds of residuals to " << totResSz << " arrays\n";
-        }
         
         std::vector<double*> tmp(totResSz, nullptr);
         auto size = numResTypes*sizeof(double);
@@ -1076,7 +1072,7 @@ void MuonResidualsGPRFitter::Print(size_t nValues, DetId id) const
     if (id.subdetId() == MuonSubdetId::CSC)
     {
         CSCDetId cscId(id.rawId());
-        std::cout << cscId << std::endl;
+        std::cout << cscId << "\n";
         for (size_t i = 0; i < nValues; ++i)
         {
             std::cout << residVec[i][static_cast<size_t>(DataCSC_6DOF::kResid)] << " "
@@ -1086,13 +1082,13 @@ void MuonResidualsGPRFitter::Print(size_t nValues, DetId id) const
                       << residVec[i][static_cast<size_t>(DataCSC_6DOF::kAngleX)] << " "
                       << residVec[i][static_cast<size_t>(DataCSC_6DOF::kAngleY)] << " " << "\n";
         }
-        std::cout << std::endl;
+        std::cout << "\n";
         std::cout << "-------------------------------------------------\n";
     }
     if (id.subdetId() == MuonSubdetId::DT)
     {
         DTChamberId dtId(id.rawId());
-        std::cout << dtId << std::endl;
+        std::cout << dtId << "\n";
         if (dtId.station() != 4)
         {
             for (size_t i = 0; i < nValues; ++i)
@@ -1122,4 +1118,36 @@ void MuonResidualsGPRFitter::Print(size_t nValues, DetId id) const
         std::cout << "\n";
         std::cout << "-------------------------------------------------\n";
     }
+}
+
+void MuonResidualsGPRFitter::Print(size_t nValues, Alignable* ali) const
+{   
+    if (!ali) 
+    {
+        std::cout << "Alignable* ali is not pointing at any valid alignable\n";
+        return;
+    }
+    DetId id = ali->geomDetId();
+    Print(nValues, id);
+}
+
+bool MuonResidualsGPRFitter::Select(DetId id) const
+{
+    if (id.subdetId() == MuonSubdetId::CSC)
+    {
+        CSCDetId cscId(id.rawId());
+        int s = cscId.station();
+        int e = cscId.endcap();
+        int r = cscId.ring();
+        return (m_CSCRings[r - 1] == '1' && m_CSCEndcaps[e - 1] == '1' && m_CSCStations[s - 1] == '1'); 
+    }
+    if (id.subdetId() == MuonSubdetId::DT)
+    {
+        DTChamberId dtId(id.rawId());
+        int s = dtId.station();
+        int w = dtId.wheel();
+        // -2 <= w <= 2
+        return (m_DTWheels[w + 2] == '1' && m_DTStations[s - 1] == '1'); 
+    }
+    return false;
 }
