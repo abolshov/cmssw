@@ -34,7 +34,12 @@ maxResSlopeY = float(os.environ["ALIGNMENT_MAXRESSLOPEY"])
 residualsModel = os.environ["ALIGNMENT_RESIDUALSMODEL"]
 peakNSigma = float(os.environ["ALIGNMENT_PEAKNSIGMA"])
 useResiduals = os.environ["ALIGNMENT_USERESIDUALS"]
+# I added the next line to add global mode configurable parameter
+# add others here
+cscEndcaps = os.environ["GLOBAL_ALIGNMENT_CSCENDCAPS"]
 is_MC = (os.environ["ALIGNMENT_ISMC"] == "True")
+doAlignment = (os.environ["DO_ALIGNMENT"] == "True")
+doGlobalAlignment = (os.environ["DO_GLOBAL_ALIGNMENT"] == "True")
 
 # optionally do selective DT or CSC alignment
 doDT = True
@@ -95,7 +100,11 @@ process.looper.algoConfig.createNtuple = createAlignNtuple
 process.looper.algoConfig.doDT = doDT
 process.looper.algoConfig.doCSC = doCSC
 process.looper.algoConfig.useResiduals = cms.string(useResiduals)
-
+# I added the next line to add global mode configurable parameter
+# add others here
+process.looper.algoConfig.cscEndcaps = cms.string(cscEndcaps)
+process.looper.algoConfig.doAlignment = doAlignment
+process.looper.algoConfig.doGlobalAlignment = doGlobalAlignment
 
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 process.GlobalTag.globaltag = cms.string(globaltag)
@@ -114,14 +123,14 @@ if is_MC:
                                                        connect = cms.string(trackerconnect),
                                                        toGet = cms.VPSet(cms.PSet(record = cms.string("TrackerAlignmentRcd"), tag = cms.string(trackeralignment))))
         process.es_prefer_TrackerAlignmentInputDB = cms.ESPrefer("PoolDBESSource", "TrackerAlignmentInputDB")
-    
+
     if trackerAPEconnect != "":
         process.TrackerAlignmentErrorInputDB = cms.ESSource("PoolDBESSource",
                                                        CondDBSetup,
                                                        connect = cms.string(trackerAPEconnect),
                                                        toGet = cms.VPSet(cms.PSet(cms.PSet(record = cms.string("TrackerAlignmentErrorExtendedRcd"), tag = cms.string(trackerAPE)))))
         process.es_prefer_TrackerAlignmentErrorInputDB = cms.ESPrefer("PoolDBESSource", "TrackerAlignmentErrorInputDB")
-    
+
     if trackerBowsconnect != "":
         process.TrackerSurfaceDeformationInputDB = cms.ESSource("PoolDBESSource",
                                                        CondDBSetup,

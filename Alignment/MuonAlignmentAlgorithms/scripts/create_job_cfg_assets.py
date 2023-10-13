@@ -119,7 +119,8 @@ if [ \'$ALIGNMENT_CLEANUP\' == \'True\' ] && [ \'zzz$ALIGNMENT_PLOTTINGTMP\' != 
 fi
 """
 
-
+# I added export ALIGNMENT_CSCENDCAPS={cscEndcaps} in align_cfg_str
+# add other global mode params here as well
 align_cfg_str = """#!/bin/sh
 
 export ALIGNMENT_CAFDIR=`pwd`
@@ -159,9 +160,12 @@ export ALIGNMENT_CREATEALIGNNTUPLE={createAlignNtuple}
 export ALIGNMENT_RESIDUALSMODEL={residualsModel}
 export ALIGNMENT_PEAKNSIGMA={peakNSigma}
 export ALIGNMENT_USERESIDUALS={useResiduals}
+export GLOBAL_ALIGNMENT_CSCENDCAPS={cscEndcaps}
 export ALIGNMENT_DO_DT={doDT}
 export ALIGNMENT_DO_CSC={doCSC}
 export ALIGNMENT_ISMC={is_MC}
+export DO_ALIGNMENT={doAlignment}
+export DO_GLOBAL_ALIGNMENT={doGlobalAlignment}
 
 cp -f {DIRNAME_directory}align_cfg.py {inputdbdir}{inputdb} {DIRNAME_directory}*.tmp  {copytrackerdb} $ALIGNMENT_CAFDIR/
 
@@ -321,8 +325,10 @@ output                  = output/{iter_dir}/{job_sh}.$(ClusterId).$(ProcId).out
 error                   = error/{iter_dir}/{job_sh}.$(ClusterId).$(ProcId).err
 log                     = log/{iter_dir}/{job_sh}.$(ClusterId).log
 universe                = vanilla
+transfer_output_files   = gpr_params.csv, log.txt
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
 +MaxRuntime             = 288000
-+AccountingGroup = "group_u_CMS.CAF.ALCA"
 queue
 """
 
@@ -332,7 +338,6 @@ output                  = output/$(filename).$(ClusterId).$(ProcId).out
 error                   = error/$(filename).$(ClusterId).$(ProcId).err
 log                     = log/$(filename).$(ClusterId).log
 universe                = vanilla
-+AccountingGroup = "group_u_CMS.CAF.ALCA"
 +MaxRuntime             = 288000
 queue filename matching files {iter_dir}/gather*.sh
 """
