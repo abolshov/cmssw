@@ -26,6 +26,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <unordered_map>
 #include <fstream>
 #include <limits>
 #include <random>
@@ -89,16 +90,25 @@ public:
     };
 
     MuonResidualsGPRFitter();
+    MuonResidualsGPRFitter(DTGeometry const* DTGeom, 
+                           CSCGeometry const* CSCGeom,
+                           std::map<Alignable*, MuonResidualsTwoBin*> const& data, 
+                           std::vector<std::string> const& opt);
     ~MuonResidualsGPRFitter();
     // ~MuonResidualsGPRFitter() = default;
 
+    MuonResidualsGPRFitter(MuonResidualsGPRFitter const& other) = delete;
+    MuonResidualsGPRFitter& operator=(MuonResidualsGPRFitter const& other) = delete;
+    MuonResidualsGPRFitter(MuonResidualsGPRFitter&& other) = delete;
+    MuonResidualsGPRFitter& operator=(MuonResidualsGPRFitter&& other) = delete;
+
     size_t NTypesOfResid(Alignable const* ali) const;
+    size_t NTypesOfResid(DetId const& id) const;
 
     inline void SetPrintLevel(int printLevel) { m_printLevel = printLevel; }
     inline void SetStrategy(int strategy) { m_strategy = strategy; }
-
-    // set residual distrubion widths 
-    inline void SetResWidths(std::map<DetId, std::vector<double>>& sigmas) { m_resWidths = sigmas; }
+    void SetOptions(std::vector<std::string> const& options); 
+    void SetOption(size_t optId, std::string const& option);
 
     inline double loglikelihood() const { return m_loglikelihood; }
 
@@ -106,27 +116,29 @@ public:
     inline int npar() const { return static_cast<int>(PARAMS::kCount); }
 
     // methods to access residuals
-    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_begin() const { return m_datamap.begin(); }
-    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_end() const { return m_datamap.end(); }
-    inline std::vector<double*>::const_iterator ResidualsBegin(Alignable* ali) const { return m_data.at(ali).cbegin(); }
-    inline std::vector<double*>::const_iterator ResidualsEnd(Alignable* ali) const { return m_data.at(ali).cend(); }
-
-    // methods returning widths of residual distributions
-    inline std::vector<double> const& getResWidths(DetId detId) const { return m_resWidths.find(detId)->second; }
-
-    // enumeration for better accessing widths in return values of function above
-    enum class ResidSigTypes { kResXSigma, kResYSigma, kResXslopeSigma, kResYslopeSigma };
+    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_begin() const { return m_datamap.begin(); } // prepare for removal
+    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_end() const { return m_datamap.end(); } // prepare for removal
+    inline std::unordered_map<DetId, std::vector<double*>>::const_iterator DataBegin() const { return m_data.cbegin(); }
+    inline std::unordered_map<DetId, std::vector<double*>>::const_iterator DataEnd() const { return m_data.cend(); }
+    inline std::vector<double*>::const_iterator ResidualsBegin(DetId const& id) const { return m_data.at(id).cbegin(); }
+    inline std::vector<double*>::const_iterator ResidualsEnd(DetId const& id) const { return m_data.at(id).cend(); }
+    inline bool Empty() const { return m_datamap.empty(); } // prepare for removal
+    inline bool IsEmpty() const { return m_data.empty(); }
 
     // method filling pairs (or const_iterator) to m_datamap
-    void Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it);
-    inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; }
-    void CopyData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap);
+    void Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it); // prepare for removal
+    inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; } // prepare for removal
+    void CopyData(std::map<Alignable*, MuonResidualsTwoBin*> const& from, double fraction = 1.0);
+    void ReleaseData();
+
+    int TrackCount() const;
 
     // checks if chamber is seleced for alignment
-    bool Select(DetId id) const;
+    bool Select(DetId const& id) const;
 
     //returns number of all residuals
-    inline size_t Size() const { return m_datamap.size(); }
+    inline size_t Size() const { return m_datamap.size(); } // prepare for removal
+    inline size_t NumberOfChambers() const { return m_data.size(); }
 
     //returns GPR parameter by given index
     inline double GetParamValue(int index) const { return m_value.at(index); }
@@ -140,8 +152,9 @@ public:
     inline CSCGeometry const* GetCSCGeometry() const { return m_CSCGeometry; }
     inline void SetCSCGeometry(CSCGeometry const* cscGeometry) { m_CSCGeometry = cscGeometry; }
 
-    void Print(size_t nValues, DetId id) const;
-    void Print(size_t nValues, Alignable* ali) const;
+    void Print(int nValues, DetId const& id) const;
+    void Print(int nValues, Alignable* ali) const;
+    void SaveResidDistr() const;
     void PlotFCN(int grid_size = 50, 
                  std::vector<double> const& lows = { -0.2, -0.2, -0.2, -0.02, -0.02, -0.02 }, 
                  std::vector<double> const& highs = { 0.2, 0.2, 0.2, 0.02, 0.02, 0.02 }) const;
@@ -165,18 +178,12 @@ private:
     double m_loglikelihood;
 
     // map store all pairs alignable chamber - TwoBin with residuals for this chamber
-    std::map<Alignable*, MuonResidualsTwoBin*> m_datamap;
-    std::map<Alignable*, std::vector<double*>> m_data;
+    std::map<Alignable*, MuonResidualsTwoBin*> m_datamap; // prepare for removal
+    std::unordered_map<DetId, std::vector<double *>> m_data;
 
     // encode which chambers to select for alignment
-    std::string m_DTWheels;
-    std::string m_DTStations;
-    std::string m_CSCEndcaps;
-    std::string m_CSCRings;
-    std::string m_CSCStations;
-
-    // widths of residual distributions
-    std::map<DetId, std::vector<double>> m_resWidths;
+    enum Options { DTWheels, DTStations, CSCEndcaps, CSCRings, CSCStations, OptCount };
+    std::vector<std::string> m_options;
 
     void inform(TMinuit *tMinuit); // add this later
 
@@ -190,13 +197,18 @@ private:
                std::vector<double> &step,
                std::vector<double> &low,
                std::vector<double> &high);
+    
+    // void TestFCN(void (*fcn)(int&, double*, double&, double*, int),
+    //              std::vector<int> &parNum,
+    //              std::vector<std::string> &parName,
+    //              std::vector<double> params);
 };
 
 
 // Auxilliary class to get information into the fit function; Idk what its doing, copied from MuonResidualsfitter.h
 class MuonResidualsGPRFitterFitInfo : public TObject {
 public:
-    MuonResidualsGPRFitterFitInfo(MuonResidualsGPRFitter *gpr_fitter) : m_gpr_fitter(gpr_fitter) {}
+    MuonResidualsGPRFitterFitInfo(MuonResidualsGPRFitter* gpr_fitter) : m_gpr_fitter(gpr_fitter) {}
     MuonResidualsGPRFitter* gpr_fitter() { return m_gpr_fitter; } // is needed to get access to gpr fitter object in likelihod calc
 
 private:

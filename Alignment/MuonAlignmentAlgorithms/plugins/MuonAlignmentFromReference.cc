@@ -179,6 +179,11 @@ private:
   // global alignment parameters
   bool m_doGlobalAlignment;
   std::string m_CSCEndcaps;
+  std::string m_CSCRings;
+  std::string m_CSCStations;
+  std::string m_DTStations;
+  std::string m_DTWheels;
+  double m_fraction;
   DTGeometry const* m_dtGeometry;
   CSCGeometry const* m_cscGeometry;
 
@@ -276,6 +281,11 @@ MuonAlignmentFromReference::MuonAlignmentFromReference(const edm::ParameterSet& 
       // global mode cfg param initialization added here
       m_doGlobalAlignment(cfg.getParameter<bool>("doGlobalAlignment")),
       m_CSCEndcaps(cfg.getParameter<std::string>("cscEndcaps")),
+      m_CSCRings(cfg.getParameter<std::string>("cscRings")),
+      m_CSCStations(cfg.getParameter<std::string>("cscStations")),
+      m_DTStations(cfg.getParameter<std::string>("dtStations")),
+      m_DTWheels(cfg.getParameter<std::string>("dtWheels")),
+      m_fraction(cfg.getParameter<double>("fraction")),
       m_createLayerNtuple_DT(cfg.getParameter<bool>("createLayerNtupleDT")),
       m_createLayerNtuple_CSC(cfg.getParameter<bool>("createLayerNtupleCSC")){
   // alignment requires a TFile to provide plots to check the fit output
@@ -917,9 +927,17 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
   // return;
 
   if (m_doGlobalAlignment) {
-    std::cout << "Doing global alignment\n";
+  // if (true) {
+    std::cout << "m_twoBin = " << m_twoBin << "\n";
+    std::cout << "Doing global alignment with parameters:\n";
+    std::cout << "\tm_CSCEndcaps = " << m_CSCEndcaps << "\n"
+              << "\tm_CSCRings = " << m_CSCRings << "\n"
+              << "\tm_CSCStations = " << m_CSCStations << "\n"
+              << "\tm_DTStations = " << m_DTStations << "\n"
+              << "\tm_DTWheels = " << m_DTWheels << "\n"
+              << "\tm_fraction = " << m_fraction << "\n";
     stop_watch.Start();
-    // doGlobalAlignment();
+    doGlobalAlignment();
     if (m_debug)
       std::cout << "doGlobalAlignment took " << stop_watch.CpuTime() << " sec" << std::endl;
     stop_watch.Stop();
@@ -942,6 +960,25 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
 }
 
 void MuonAlignmentFromReference::fitAndAlign() {
+  // std::cout << "Positions of chambers in global frame before local alignment:\n";
+  // for (auto const& ali: m_alignables) 
+  // {
+  //     DetId id = ali->geomDetId();
+  //     if (id.subdetId() == MuonSubdetId::CSC)
+  //     {
+  //       CSCDetId cscId(id.rawId());
+  //       // align::RotationType const& orientation = ali->globalRotation();
+  //       align::PositionType const& position = ali->globalPosition();
+  //       std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+  //       // std::cout << orientation << "\n";
+  //       std::cout << "ali->globalPosition():\n";
+  //       std::cout << position << "\n";
+  //       std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
+  //       auto pos = m_cscGeometry->idToDet(id)->position();
+  //       std::cout << pos << "\n";
+  //       std::cout << "--------------------------------------" << "\n";
+  //     }
+  // }
   bool m_debug = false;
   using namespace std::chrono;
 
@@ -1009,36 +1046,17 @@ void MuonAlignmentFromReference::fitAndAlign() {
   }
 
   if (m_debug) std::cout << "***** just after report.open" << std::endl;
-
-  // std::map<Alignable*, MuonResidualsTwoBin*> dts;
- 
-  // for (const auto& ali: m_alignables) 
-  // {
-  //     DetId id = ali->geomDetId();
-  //     if (id.subdetId() == MuonSubdetId::DT) 
-  //     {
-  //         DTChamberId dtId(id.rawId());
-  //         std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it = m_fitters.find(ali);
-  //         dts.insert(*it);
-  //     }
-  // }
   
-  std::map<DetId, std::vector<double>> sigmas;
   std::map<int, int> wheel_counts{{-2, 0}, {-1, 0}, {0, 0}, {1, 0}, {2, 0}};
-  std::map<int, int> station_counts{{1, 0}, {2, 0}, {3, 0}, {4, 0}};
+  std::map<int, int> dt_station_counts{{1, 0}, {2, 0}, {3, 0}, {4, 0}};
+
+  std::map<int, int> endcap_counts{{1, 0}, {2, 0}};
+  std::map<int, int> csc_station_counts{{1, 0}, {2, 0}, {3, 0}, {4, 0}};
+  std::map<int, int> ring_counts{{1, 0}, {2, 0}, {3, 0}};
+
   int resid_count = 0;
 
-  // for (auto const& ali: m_alignables)
-  // {
-  //   DetId id_check = ali->geomDetId();
-  //   if (id_check.subdetId() == MuonSubdetId::DT) 
-  //   {
-  //     DTChamberId dtId(id_check.rawId());
-  //     align::PositionType const& position = ali->globalPosition();
-  //     std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << position << std::endl;
-  //     std::cout << "--------------------------------------" << std::endl;
-  //   }
-  // }
+  std::ofstream w0st1("w0st1.txt");
 
   auto start = high_resolution_clock::now();
   for (const auto& ali : m_alignables) {
@@ -1149,10 +1167,20 @@ void MuonAlignmentFromReference::fitAndAlign() {
       auto nNeg = fitter->second->numResidualsNeg();
       wheel_counts[dtId.wheel()] += nPos;
       wheel_counts[dtId.wheel()] += nNeg;
-      station_counts[dtId.station()] += nPos;
-      station_counts[dtId.station()] += nNeg;
-
-      // Tracer::instance() << "[" << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << "]: " << nPos + nNeg << "\n";
+      dt_station_counts[dtId.station()] += nPos;
+      dt_station_counts[dtId.station()] += nNeg;
+    }
+    if (Id.subdetId() == MuonSubdetId::CSC)
+    {
+      CSCDetId cscId(Id.rawId());
+      auto nPos = fitter->second->numResidualsPos();
+      auto nNeg = fitter->second->numResidualsNeg();
+      endcap_counts[cscId.endcap()] += nPos;
+      endcap_counts[cscId.endcap()] += nNeg;
+      csc_station_counts[cscId.station()] += nPos;
+      csc_station_counts[cscId.station()] += nNeg;
+      ring_counts[cscId.ring()] += nPos;
+      ring_counts[cscId.ring()] += nPos;
     }
 
     resid_count += fitter->second->numResidualsPos();
@@ -1586,6 +1614,22 @@ void MuonAlignmentFromReference::fitAndAlign() {
             if (align_phiz)
               params[paramIndex[5]] = deltaphiz_value;
           }
+
+          // collect info about local alignment in station 1 wheel 0
+          DetId thisId = thisali->geomDetId();
+          if (thisId.subdetId() == MuonSubdetId::DT)
+          {
+            DTChamberId thisDtId(thisId.rawId());
+            if (thisDtId.wheel() == 0 && thisDtId.station() == 1)
+            {
+              w0st1 << "chamber " << thisDtId.sector() << "\n";
+              w0st1 << "params: " << deltax_value << " " << deltay_value << " " << deltaz_value << " " 
+                                  << deltaphix_value << " " << deltaphiy_value << " " << deltaphiz_value << "\n";
+              w0st1 << "errors: " << deltax_error << " " << deltay_error << " " << deltaz_error << " " 
+                                  << deltaphix_error << " " << deltaphiy_error << " " << deltaphiz_error << "\n";
+              w0st1 << "---------------------------------------------------------------\n";
+            }
+          }
         }  // end if 6DOF
 
         else if (fitter->second->type() == MuonResidualsFitter::k6DOFrphi) {
@@ -1801,95 +1845,84 @@ void MuonAlignmentFromReference::fitAndAlign() {
   tracer << "Local Alignment done!\n";
   tracer << "Local Alignment took " << duration.count() << " ms\n";
 
-  // tracer << "Positions of chambers in global frame after local alignment:\n";
-  // for (auto const& ali: m_alignables) 
-  // {
-  //     DetId id = ali->geomDetId();
-  //     if (id.subdetId() == MuonSubdetId::DT)
-  //     {
-  //       DTChamberId dtId(id.rawId());
-  //       align::RotationType const& orientation = ali->globalRotation();
-  //       align::PositionType const& position = ali->globalPosition();
-  //       tracer << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-  //       tracer << orientation << "\n";
-  //       tracer << position << "\n";
-  //       tracer << "--------------------------------------" << "\n";
-  //     }
-  // }
+  w0st1.close();
 
-  // asess local alignment cost
-  // for (auto const& ali: m_alignables)
-  // {
-  //   DetId id_check = ali->geomDetId();
-  //   if (id_check.subdetId() == MuonSubdetId::DT) 
-  //   {
-  //     DTChamberId dtId(id_check.rawId());
-  //     align::PositionType const& position = ali->globalPosition();
-  //     std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << position << std::endl;
-  //     std::cout << "--------------------------------------" << std::endl;
-  //   }
-  // }
-
-  // =================================== GLOBAL ALIGNMENT START ===================================
-  // double resx_std = 0.5;
-  // double resy_std = 3.0;
-  // double resslopex_std = 0.002;
-  // double resslopey_std = 0.005;
-
-  // std::vector<double> sigmas_std = {resx_std, resy_std, resslopex_std, resslopey_std};
-
-  // for (auto& item: sigmas)
-  // {
-  //   auto rule = [](double x, double y) 
-  //   {
-  //     if (x == 0.0) return y;
-  //     return x;
-  //   };
-  //   std::transform(item.second.begin(), item.second.end(), sigmas_std.begin(), item.second.begin(), rule);
-  // }
-
-  // m_GPRFitter = MuonResidualsGPRFitter(m_dtGeometry, dts, sigmas);
-  // using namespace std::chrono;
-
-  // std::ofstream file;
-  // file.open("gpr_params.csv");
-  // std::vector<double> lows{ -0.2, -0.2, -0.2, -0.001, -0.001, -0.001 };
-  // std::vector<double> highs{ 0.2, 0.2, 0.2, 0.001, 0.001, 0.001 };
-  // // m_GPRFitter.scan_FCN(30, lows, highs);
-
-  // start = high_resolution_clock::now();
-  // bool gpr_fit_done = m_GPRFitter.fit();
-  // stop = high_resolution_clock::now();
-  // duration = duration_cast<milliseconds>(stop - start);
-
-  // if (gpr_fit_done)
-  // {
-  //   tracer << "Global Alignment done!" << "\n";
-  //   tracer << "Global Alignment took " << duration.count() << " ms" << "\n";
-  //   tracer << "Global Alignment parameters: ";
-  //   file << "dx,dy,dz,dphix,dphiy,dphiz\n";
-  //   for (size_t i = 0; i < 6; ++i)
-  //   {
-  //     tracer << m_GPRFitter.getParamValue(i) << " ";
-  //     file << m_GPRFitter.getParamValue(i) << ",";
-  //   }
-  //   file << std::endl;
-  //   tracer << "\n";
-  // }
-  // file.close();
-  // =================================== GLOBAL ALIGNMENT END ===================================
+  std::ofstream local_ali_file_e1("endcap1_local_alignment_file.txt");
+  std::ofstream local_ali_file_e2("endcap2_local_alignment_file.txt");
+  std::ofstream local_ali_file_dt("dt_local_alignment.txt");
+  // std::cout << "Positions of chambers in global frame after local alignment:\n";
+  for (auto const& ali: m_alignables) 
+  {
+      DetId id = ali->geomDetId();
+      if (id.subdetId() == MuonSubdetId::CSC)
+      {
+        CSCDetId cscId(id.rawId());
+        if (cscId.endcap() == 1)
+        {
+          align::RotationType const& orientation = ali->globalRotation();
+          align::PositionType const& position = ali->globalPosition();
+          local_ali_file_e1 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+          local_ali_file_e1 << position << "\n";
+          local_ali_file_e1 << orientation << "\n";
+        }
+        else if (cscId.endcap() == 2)
+        {
+          align::RotationType const& orientation = ali->globalRotation();
+          align::PositionType const& position = ali->globalPosition();
+          local_ali_file_e2 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+          local_ali_file_e2 << position << "\n";
+          local_ali_file_e2 << orientation << "\n";
+        }
+        // std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+        // std::cout << orientation << "\n";
+        // std::cout << "ali->globalPosition():\n";
+        // std::cout << position << "\n";
+        // std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
+        // auto pos = m_cscGeometry->idToDet(id)->position();
+        // std::cout << pos << "\n";
+        std::cout << "--------------------------------------" << "\n";
+      }
+      else if (id.subdetId() == MuonSubdetId::DT)
+      {
+        DTChamberId dtId(id.rawId());
+        align::RotationType const& orientation = ali->globalRotation();
+        align::PositionType const& position = ali->globalPosition();
+        local_ali_file_dt << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
+        local_ali_file_dt << position << "\n";
+        local_ali_file_dt << orientation << "\n";
+      }
+  }
+  local_ali_file_e1.close();
+  local_ali_file_e2.close();
+  local_ali_file_dt.close();
 
   tracer << "residual counts: " << "\n";
   tracer << "---- total: " << resid_count << "\n";
-  tracer << "---- by wheel:" << "\n";
-  for (auto const& count: wheel_counts)
+  tracer << "---- DT wheels:" << "\n";
+  for (auto const& [wheel, count]: wheel_counts)
   {
-    tracer << "\t wheel " << count.first << ": " << count.second << "\n";
+    tracer << "\t wheel " << wheel << ": " << count << "\n";
   }
-  tracer << "---- by station:" << "\n";
-  for (auto const& count: station_counts)
+  tracer << "---- DT stations:" << "\n";
+  for (auto const& [station, count]: dt_station_counts)
   {
-    tracer << "\t station " << count.first << ": " << count.second << "\n";
+    tracer << "\t station " << station << ": " << count << "\n";
+  }
+
+  tracer << "---- CSC endcaps:" << "\n";
+  for (auto const& [endcap, count]: endcap_counts)
+  {
+    tracer << "\t endcap " << endcap << ": " << count << "\n";
+  }
+  tracer << "---- CSC stations:" << "\n";
+  for (auto const& [station, count]: csc_station_counts)
+  {
+    tracer << "\t station " << station << ": " << count << "\n";
+  }
+  tracer << "---- CSC rings:\n";
+  for (auto const& [ring, count]: ring_counts)
+  {
+    tracer << "\t ring " << ring << ": " << count << "\n";
   }
 
   if (writeReport)
@@ -1932,8 +1965,8 @@ void MuonAlignmentFromReference::readTmpFiles() {
 
 void MuonAlignmentFromReference::test()
 {
-  std::random_device rd;
-  std::uniform_real_distribution<double> dist(0.0000001, 0.01);
+  // std::random_device rd;
+  // std::uniform_real_distribution<double> dist(0.0000001, 0.01);
 
   for (auto const& ali: m_alignables) 
   {
@@ -1967,11 +2000,11 @@ void MuonAlignmentFromReference::test()
           tFile->Write();
           tFile->Close();
 
-          align::RotationType const& orientation = ali->globalRotation();
+          // align::RotationType const& orientation = ali->globalRotation();
           // std::cout << "orientation.xy() = " << orientation.xy() << "\n";
           // align::PositionType const& position = ali->globalPosition();
-          std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-          std::cout << "orientation:\n" << orientation << "\n";
+          // std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
+          // std::cout << "orientation:\n" << orientation << "\n";
           // auto prod = orientation*orientation.transposed();
           // std::cout << "product:\n" << prod << "\n";
           // align::EulerAngles const& rotAngles = align::toAngles(orientation);
@@ -1991,22 +2024,22 @@ void MuonAlignmentFromReference::test()
           // std::cout << "angles1:\n" << angles1 << "\n";
           // std::cout << "angles2:\n" << angles2 << "\n";
 
-          align::EulerAngles globAngles(3);
-          for (size_t i = 0; i < 100; ++i)
-          {
-            globAngles[0] = dist(rd);
-            globAngles[1] = dist(rd);
-            globAngles[2] = dist(rd);
-            align::RotationType mtrx = align::toMatrix(globAngles);
-            align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
-            GlobalVector gRotVec = GlobalVector(globAngles[0], globAngles[1], globAngles[2]);
-            LocalVector lRotVec = m_dtGeometry->idToDet(id)->toLocal(gRotVec);
-            std::cout << locAngles[0]/lRotVec.x() << "\n"
-                      << locAngles[1]/lRotVec.y() << "\n"
-                      << locAngles[2]/lRotVec.z() << "\n"
-                      << "----------------------------\n";
+          // align::EulerAngles globAngles(3);
+          // for (size_t i = 0; i < 100; ++i)
+          // {
+          //   globAngles[0] = dist(rd);
+          //   globAngles[1] = dist(rd);
+          //   globAngles[2] = dist(rd);
+          //   align::RotationType mtrx = align::toMatrix(globAngles);
+          //   align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
+          //   GlobalVector gRotVec = GlobalVector(globAngles[0], globAngles[1], globAngles[2]);
+          //   LocalVector lRotVec = m_dtGeometry->idToDet(id)->toLocal(gRotVec);
+          //   std::cout << locAngles[0]/lRotVec.x() << "\n"
+          //             << locAngles[1]/lRotVec.y() << "\n"
+          //             << locAngles[2]/lRotVec.z() << "\n"
+          //             << "----------------------------\n";
             
-          }
+          // }
 
           // std::cout << "in local 1:\n" << orientation*mat*orientation.transposed() << "\n";
           // std::cout << "in local 2:\n" << orientation.transposed()*mat*orientation << "\n";
@@ -2021,28 +2054,35 @@ void MuonAlignmentFromReference::test()
 
 void MuonAlignmentFromReference::doGlobalAlignment()
 {
-  std::cout << "m_CSCEndcaps = " << m_CSCEndcaps << "\n";
-  return;
+  Tracer::instance() << "Dataset fraction used for global alignment: " << m_fraction << "\n";
   using namespace std::chrono;
   // configure GPR fitter
-  std::string DTWheels("00000");
-  std::string DTStations("0000");
-  std::string CSCEndcaps("10");
-  std::string CSCRings("111");
-  std::string CSCStations("1111");
-  std::vector<std::string> options{ DTWheels, DTStations, CSCEndcaps, CSCRings, CSCStations };
+  std::vector<std::string> options{ m_DTWheels, m_DTStations, m_CSCEndcaps, m_CSCRings, m_CSCStations };
+  MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, m_fitters, options);
 
-  if (m_doCSC && !m_doDT)
+  if (m_doCSC && !m_doDT && m_CSCEndcaps == "11")
   {
     Tracer::instance() << "fitting CSC endcaps separately!\n";
-    std::ofstream file;
-    file.open("gpr_params.csv");
-    MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, m_fitters, options);
-    
+
+    GPRFitter.SetOption(2, "10");
+
     auto start = high_resolution_clock::now();
-    bool gpr_fit_done = GPRFitter.Fit();
+    GPRFitter.CopyData(m_fitters, m_fraction);
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
+    std::cout << "Copying took " << duration.count() << " ms" << "\n";
+    Tracer::instance() << "Copying took " << duration.count() << " ms\n";
+
+    Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
+    Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
+    std::ofstream file;
+    file.open("gpr_params.csv");
+    
+    start = high_resolution_clock::now();
+    bool gpr_fit_done = GPRFitter.Fit();
+    stop = high_resolution_clock::now();
+    duration = duration_cast<milliseconds>(stop - start);
 
     if (gpr_fit_done)
     {
@@ -2052,17 +2092,30 @@ void MuonAlignmentFromReference::doGlobalAlignment()
       file << "dx,dy,dz,dphix,dphiy,dphiz\n";
       for (size_t i = 0; i < 6; ++i)
       {
-        // Tracer::instance() << m_GPRFitter.GetParamValue(i) << " ";
         Tracer::instance() << GPRFitter.GetParamValue(i) << " ";
-        // file << m_GPRFitter.GetParamValue(i) << ",";
         file << GPRFitter.GetParamValue(i) << ",";
       }
+
       file << "\n";
       Tracer::instance() << "\n";
     }
 
+    GPRFitter.ReleaseData();
+    Tracer::instance() << "Pointers to data have been released\n";
+    Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
+    Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
     GPRFitter.SetOption(2, "01");
-    
+
+    start = high_resolution_clock::now();
+    GPRFitter.CopyData(m_fitters, m_fraction);
+    stop = high_resolution_clock::now();
+    duration = duration_cast<milliseconds>(stop - start);
+    std::cout << "Copying took " << duration.count() << " ms" << "\n";
+    Tracer::instance() << "Copying took " << duration.count() << " ms\n";
+    Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
+    Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
     start = high_resolution_clock::now();
     gpr_fit_done = GPRFitter.Fit();
     stop = high_resolution_clock::now();
@@ -2075,25 +2128,65 @@ void MuonAlignmentFromReference::doGlobalAlignment()
       Tracer::instance() << "Global Alignment of CSC Endcap 2 parameters: ";
       for (size_t i = 0; i < 6; ++i)
       {
-        // Tracer::instance() << m_GPRFitter.GetParamValue(i) << " ";
         Tracer::instance() << GPRFitter.GetParamValue(i) << " ";
-        // file << m_GPRFitter.GetParamValue(i) << ",";
         file << GPRFitter.GetParamValue(i) << ",";
       }
+
       file << "\n";
       Tracer::instance() << "\n";
     }
     
     file.close();
-    return;
   }
+
+  if (m_doDT && !m_doCSC) 
+  {
+    Tracer::instance() << "Fitting DT barrel\n";
+    auto start = high_resolution_clock::now();
+    GPRFitter.CopyData(m_fitters, m_fraction);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start);
+    std::cout << "Copying took " << duration.count() << " ms" << "\n";
+    Tracer::instance() << "Copying took " << duration.count() << " ms\n";
+
+    Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
+    Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
+    GPRFitter.SaveResidDistr();
+
+    std::ofstream file;
+    file.open("gpr_params.csv");
+    
+    start = high_resolution_clock::now();
+    bool gpr_fit_done = GPRFitter.Fit();
+    stop = high_resolution_clock::now();
+    duration = duration_cast<milliseconds>(stop - start);
+
+    if (gpr_fit_done)
+    {
+      Tracer::instance() << "Global Alignment of DT barrel done!" << "\n";
+      Tracer::instance() << "Global Alignment of DT barrel took " << duration.count() << " ms" << "\n";
+      Tracer::instance() << "Global Alignment of DT barrel parameters: ";
+      file << "dx,dy,dz,dphix,dphiy,dphiz\n";
+      for (size_t i = 0; i < 6; ++i)
+      {
+        Tracer::instance() << GPRFitter.GetParamValue(i) << " ";
+        file << GPRFitter.GetParamValue(i) << ",";
+      }
+
+      file << "\n";
+      Tracer::instance() << "\n";
+    }
+    file.close();
+  }
+
   // std::string DTWheels("00000");
   // std::string DTStations("0000");
   // std::string CSCEndcaps("11");
   // std::string CSCRings("111");
   // std::string CSCStations("1111");
   // std::vector<std::string> options{ DTWheels, DTStations, CSCEndcaps, CSCRings, CSCStations };
-  MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, m_fitters, options);
+  // MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, m_fitters, options);
   
   // GPRFitter.SetData(m_fitters);
   // if (m_doCSC) GPRFitter.SetCSCGeometry(m_cscGeometry);
@@ -2104,7 +2197,7 @@ void MuonAlignmentFromReference::doGlobalAlignment()
 
   // =====TEST CopyData METHOD BEGIN=====
   // auto start = high_resolution_clock::now();
-  // m_GPRFitter.CopyData(m_fitters);
+  // GPRFitter.CopyData(m_fitters);
   // auto stop = high_resolution_clock::now();
   // auto duration = duration_cast<milliseconds>(stop - start);
   // std::cout << "Copying took " << duration.count() << " ms" << std::endl;
@@ -2119,68 +2212,67 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   //   DetId id = ali->geomDetId();
   //   if (id.subdetId() == MuonSubdetId::CSC && GPRFitter.Select(id))
   //   {
-  //     // thisId = id;
-  //     // CSCDetId cscId(id.rawId());
-  //     // std::cout << "This chamber has been selected:\n";
-  //     // std::cout << cscId << "\n";
-  //     // std::cout << "\tring = " << cscId.ring() << "\n"
-  //     //           << "\tstation = " << cscId.station() << "\n"
-  //     //           << "\tendcap = " << cscId.endcap() << "\n";
+  //     thisId = id;
+  //     CSCDetId cscId(id.rawId());
+  //     std::cout << "This chamber has been selected:\n";
+  //     std::cout << cscId << "\n";
+  //     std::cout << "\tring = " << cscId.ring() << "\n"
+  //               << "\tstation = " << cscId.station() << "\n"
+  //               << "\tendcap = " << cscId.endcap() << "\n";
   //     // auto start = fitter.second->residualsPos_begin();
-  //     // for (auto it = fitter.second->residualsPos_begin(); it < fitter.second->residualsPos_begin() + 10; ++it)
-  //     // {
-  //     //   auto current_array = *it;
-  //     //   std::cout << current_array[MuonResiduals6DOFrphiFitter::kResid] << " "
-  //     //             << current_array[MuonResiduals6DOFrphiFitter::kResSlope] << " "
-  //     //             << current_array[MuonResiduals6DOFrphiFitter::kPositionX] << " "
-  //     //             << current_array[MuonResiduals6DOFrphiFitter::kPositionY] << " "
-  //     //             << current_array[MuonResiduals6DOFrphiFitter::kAngleX] << " "
-  //     //             << current_array[MuonResiduals6DOFrphiFitter::kAngleY] << " "
-  //     //             << "\n";
-  //     // }
-  //     // std::cout << "\n";
-  //     // std::cout << "----------------------------\n";
-  //     // break;
+  //     for (auto it = fitter.second->residualsPos_begin(); it < fitter.second->residualsPos_begin() + 10; ++it)
+  //     {
+  //       auto current_array = *it;
+  //       std::cout << current_array[MuonResiduals6DOFrphiFitter::kResid] << " "
+  //                 << current_array[MuonResiduals6DOFrphiFitter::kResSlope] << " "
+  //                 << current_array[MuonResiduals6DOFrphiFitter::kPositionX] << " "
+  //                 << current_array[MuonResiduals6DOFrphiFitter::kPositionY] << " "
+  //                 << current_array[MuonResiduals6DOFrphiFitter::kAngleX] << " "
+  //                 << current_array[MuonResiduals6DOFrphiFitter::kAngleY] << " "
+  //                 << "\n";
+  //     }
+  //     std::cout << "\n";
+  //     std::cout << "----------------------------\n";
+  //     break;
   //   }
   // }
 
   // std::cout << "From m_data:" << "\n";
-  // m_GPRFitter.Print(10, thisId);
+  // GPRFitter.Print(10, thisId);
   // =====TEST CopyData METHOD END=====
-
-  std::ofstream file;
-  file.open("gpr_params.csv");
   
   if (m_debug)
   {
     // plots FCN in default range (see MuonResidualsGPRFitter.h)
-    // m_GPRFitter.PlotFCN();
     GPRFitter.PlotFCN();
   }
 
-  auto start = high_resolution_clock::now();
-  bool gpr_fit_done = GPRFitter.Fit();
-  auto stop = high_resolution_clock::now();
-  auto duration = duration_cast<milliseconds>(stop - start);
+  // DT GLOBAL FIT START 
+  // std::ofstream file;
+  // file.open("gpr_params.csv");
 
-  if (gpr_fit_done)
-  {
-    Tracer::instance() << "Global Alignment done!" << "\n";
-    Tracer::instance() << "Global Alignment took " << duration.count() << " ms" << "\n";
-    std::cout << "Global Alignment took " << duration.count() << " ms" << "\n";
-    Tracer::instance() << "Global Alignment parameters: ";
-    file << "dx,dy,dz,dphix,dphiy,dphiz\n";
-    for (size_t i = 0; i < 6; ++i)
-    {
-      // Tracer::instance() << m_GPRFitter.GetParamValue(i) << " ";
-      Tracer::instance() << GPRFitter.GetParamValue(i) << " ";
-      // file << m_GPRFitter.GetParamValue(i) << ",";
-      file << GPRFitter.GetParamValue(i) << ",";
-    }
-    file << "\n";
-    Tracer::instance() << "\n";
-  }
-  file.close();
+  // start = high_resolution_clock::now();
+  // bool gpr_fit_done = GPRFitter.Fit();
+  // stop = high_resolution_clock::now();
+  // duration = duration_cast<milliseconds>(stop - start);
+
+  // if (gpr_fit_done)
+  // {
+  //   Tracer::instance() << "Global Alignment done!" << "\n";
+  //   Tracer::instance() << "Global Alignment took " << duration.count() << " ms" << "\n";
+  //   std::cout << "Global Alignment took " << duration.count() << " ms" << "\n";
+  //   Tracer::instance() << "Global Alignment parameters: ";
+  //   file << "dx,dy,dz,dphix,dphiy,dphiz\n";
+  //   for (size_t i = 0; i < 6; ++i)
+  //   {
+  //     Tracer::instance() << GPRFitter.GetParamValue(i) << " ";
+  //     file << GPRFitter.GetParamValue(i) << ",";
+  //   }
+  //   file << "\n";
+  //   Tracer::instance() << "\n";
+  // }
+  // file.close();
+  // DT GLOBAL FIT END
 
   // float dphix = m_GPRFitter.getParamValue(3);
   // float dphiy = m_GPRFitter.getParamValue(4);
