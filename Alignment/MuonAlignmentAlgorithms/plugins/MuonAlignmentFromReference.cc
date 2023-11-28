@@ -927,7 +927,6 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
   // return;
 
   if (m_doGlobalAlignment) {
-  // if (true) {
     std::cout << "m_twoBin = " << m_twoBin << "\n";
     std::cout << "Doing global alignment with parameters:\n";
     std::cout << "\tm_CSCEndcaps = " << m_CSCEndcaps << "\n"
@@ -944,7 +943,7 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
   }
 
   // fit and align (time-consuming, so the user can turn it off if in a residuals-gathering job)
-  if (m_doAlignment) {
+  if (false) {
     stop_watch.Start();
     fitAndAlign();
     if (m_debug)
@@ -1056,7 +1055,7 @@ void MuonAlignmentFromReference::fitAndAlign() {
 
   int resid_count = 0;
 
-  std::ofstream w0st1("w0st1.txt");
+  // std::ofstream w0st1("w0st1.txt");
 
   auto start = high_resolution_clock::now();
   for (const auto& ali : m_alignables) {
@@ -1616,20 +1615,20 @@ void MuonAlignmentFromReference::fitAndAlign() {
           }
 
           // collect info about local alignment in station 1 wheel 0
-          DetId thisId = thisali->geomDetId();
-          if (thisId.subdetId() == MuonSubdetId::DT)
-          {
-            DTChamberId thisDtId(thisId.rawId());
-            if (thisDtId.wheel() == 0 && thisDtId.station() == 1)
-            {
-              w0st1 << "chamber " << thisDtId.sector() << "\n";
-              w0st1 << "params: " << deltax_value << " " << deltay_value << " " << deltaz_value << " " 
-                                  << deltaphix_value << " " << deltaphiy_value << " " << deltaphiz_value << "\n";
-              w0st1 << "errors: " << deltax_error << " " << deltay_error << " " << deltaz_error << " " 
-                                  << deltaphix_error << " " << deltaphiy_error << " " << deltaphiz_error << "\n";
-              w0st1 << "---------------------------------------------------------------\n";
-            }
-          }
+          // DetId thisId = thisali->geomDetId();
+          // if (thisId.subdetId() == MuonSubdetId::DT)
+          // {
+          //   DTChamberId thisDtId(thisId.rawId());
+          //   if (thisDtId.wheel() == 0 && thisDtId.station() == 1)
+          //   {
+          //     w0st1 << "chamber " << thisDtId.sector() << "\n";
+          //     w0st1 << "params: " << deltax_value << " " << deltay_value << " " << deltaz_value << " " 
+          //                         << deltaphix_value << " " << deltaphiy_value << " " << deltaphiz_value << "\n";
+          //     w0st1 << "errors: " << deltax_error << " " << deltay_error << " " << deltaz_error << " " 
+          //                         << deltaphix_error << " " << deltaphiy_error << " " << deltaphiz_error << "\n";
+          //     w0st1 << "---------------------------------------------------------------\n";
+          //   }
+          // }
         }  // end if 6DOF
 
         else if (fitter->second->type() == MuonResidualsFitter::k6DOFrphi) {
@@ -1845,56 +1844,56 @@ void MuonAlignmentFromReference::fitAndAlign() {
   tracer << "Local Alignment done!\n";
   tracer << "Local Alignment took " << duration.count() << " ms\n";
 
-  w0st1.close();
+  // w0st1.close();
 
-  std::ofstream local_ali_file_e1("endcap1_local_alignment_file.txt");
-  std::ofstream local_ali_file_e2("endcap2_local_alignment_file.txt");
-  std::ofstream local_ali_file_dt("dt_local_alignment.txt");
+  // std::ofstream local_ali_file_e1("endcap1_local_alignment_file.txt");
+  // std::ofstream local_ali_file_e2("endcap2_local_alignment_file.txt");
+  // std::ofstream local_ali_file_dt("dt_local_alignment.txt");
   // std::cout << "Positions of chambers in global frame after local alignment:\n";
-  for (auto const& ali: m_alignables) 
-  {
-      DetId id = ali->geomDetId();
-      if (id.subdetId() == MuonSubdetId::CSC)
-      {
-        CSCDetId cscId(id.rawId());
-        if (cscId.endcap() == 1)
-        {
-          align::RotationType const& orientation = ali->globalRotation();
-          align::PositionType const& position = ali->globalPosition();
-          local_ali_file_e1 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-          local_ali_file_e1 << position << "\n";
-          local_ali_file_e1 << orientation << "\n";
-        }
-        else if (cscId.endcap() == 2)
-        {
-          align::RotationType const& orientation = ali->globalRotation();
-          align::PositionType const& position = ali->globalPosition();
-          local_ali_file_e2 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-          local_ali_file_e2 << position << "\n";
-          local_ali_file_e2 << orientation << "\n";
-        }
-        // std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-        // std::cout << orientation << "\n";
-        // std::cout << "ali->globalPosition():\n";
-        // std::cout << position << "\n";
-        // std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
-        // auto pos = m_cscGeometry->idToDet(id)->position();
-        // std::cout << pos << "\n";
-        std::cout << "--------------------------------------" << "\n";
-      }
-      else if (id.subdetId() == MuonSubdetId::DT)
-      {
-        DTChamberId dtId(id.rawId());
-        align::RotationType const& orientation = ali->globalRotation();
-        align::PositionType const& position = ali->globalPosition();
-        local_ali_file_dt << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-        local_ali_file_dt << position << "\n";
-        local_ali_file_dt << orientation << "\n";
-      }
-  }
-  local_ali_file_e1.close();
-  local_ali_file_e2.close();
-  local_ali_file_dt.close();
+  // for (auto const& ali: m_alignables) 
+  // {
+  //     DetId id = ali->geomDetId();
+  //     if (id.subdetId() == MuonSubdetId::CSC)
+  //     {
+  //       CSCDetId cscId(id.rawId());
+  //       if (cscId.endcap() == 1)
+  //       {
+  //         align::RotationType const& orientation = ali->globalRotation();
+  //         align::PositionType const& position = ali->globalPosition();
+  //         local_ali_file_e1 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+  //         local_ali_file_e1 << position << "\n";
+  //         local_ali_file_e1 << orientation << "\n";
+  //       }
+  //       else if (cscId.endcap() == 2)
+  //       {
+  //         align::RotationType const& orientation = ali->globalRotation();
+  //         align::PositionType const& position = ali->globalPosition();
+  //         local_ali_file_e2 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+  //         local_ali_file_e2 << position << "\n";
+  //         local_ali_file_e2 << orientation << "\n";
+  //       }
+  //       // std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
+  //       // std::cout << orientation << "\n";
+  //       // std::cout << "ali->globalPosition():\n";
+  //       // std::cout << position << "\n";
+  //       // std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
+  //       // auto pos = m_cscGeometry->idToDet(id)->position();
+  //       // std::cout << pos << "\n";
+  //       std::cout << "--------------------------------------" << "\n";
+  //     }
+  //     else if (id.subdetId() == MuonSubdetId::DT)
+  //     {
+  //       DTChamberId dtId(id.rawId());
+  //       align::RotationType const& orientation = ali->globalRotation();
+  //       align::PositionType const& position = ali->globalPosition();
+  //       local_ali_file_dt << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
+  //       local_ali_file_dt << position << "\n";
+  //       local_ali_file_dt << orientation << "\n";
+  //     }
+  // }
+  // local_ali_file_e1.close();
+  // local_ali_file_e2.close();
+  // local_ali_file_dt.close();
 
   tracer << "residual counts: " << "\n";
   tracer << "---- total: " << resid_count << "\n";
@@ -2152,8 +2151,6 @@ void MuonAlignmentFromReference::doGlobalAlignment()
     Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
     Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
 
-    GPRFitter.SaveResidDistr();
-
     std::ofstream file;
     file.open("gpr_params.csv");
     
@@ -2241,10 +2238,41 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   // GPRFitter.Print(10, thisId);
   // =====TEST CopyData METHOD END=====
   
+
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignY, MuonResidualsGPRFitter::PARAMS::kAlignZ);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignY, MuonResidualsGPRFitter::PARAMS::kAlignPhiX);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignY, MuonResidualsGPRFitter::PARAMS::kAlignPhiY);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignY, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
+
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignPhiX, MuonResidualsGPRFitter::PARAMS::kAlignPhiY);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignPhiX, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignZ, MuonResidualsGPRFitter::PARAMS::kAlignPhiX);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignZ, MuonResidualsGPRFitter::PARAMS::kAlignPhiY);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignZ, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignPhiY, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
+
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignY);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignZ);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignPhiX);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignPhiY);
+  // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
+
+  // 10% from true value
+  // std::vector<double> lows{ -0.153362,0.427482,0.202473,-0.0004312,0.0003717,7.027029e-05 };
+  // std::vector<double> highs{ -0.125478,0.522478,0.247467,-0.0003528,0.0004543,8.588591e-05 };
+
+  // 30% from true value
+  std::vector<double> highs{ -0.097593, 0.617474, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
+  std::vector<double> lows{ -0.181245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
+  int nPt = 50;
+
+  GPRFitter.PlotFCN(nPt, lows, highs);
+
   if (m_debug)
   {
     // plots FCN in default range (see MuonResidualsGPRFitter.h)
     GPRFitter.PlotFCN();
+    GPRFitter.SaveResidDistr();
   }
 
   // DT GLOBAL FIT START 
