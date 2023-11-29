@@ -154,9 +154,9 @@ public:
 
     // debugging tools
     void Print(int nValues, DetId const& id) const;
-    void Print(int nValues, Alignable* ali) const;
+    void Print(int nValues, Alignable* ali) const; // remove
     void SaveResidDistr() const;
-    void MakeContourPlots();
+    void PlotContours(int n_points = 16);
     void PlotContour(PARAMS par1, PARAMS par2, int n_points = 16);
     void PlotFCN(int grid_size = 50, 
                  std::vector<double> const& lows = { -0.2, -0.2, -0.2, -0.02, -0.02, -0.02 }, 

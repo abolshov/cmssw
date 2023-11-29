@@ -740,17 +740,15 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     double grad[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, fcn_zero, par, flag);
 
-    double true_shift[6] = {-0.13942,0.47498,0.22497,-0.000392,0.000413,7.80781e-05};
-    double calc_shift[6] = {-0.136652,0.474536,0.226821,-0.00038449,0.000405018,8.76458e-05};
+    // double true_shift[6] = {-0.13942,0.47498,0.22497,-0.000392,0.000413,7.80781e-05};
+    // double calc_shift[6] = {-0.136652,0.474536,0.226821,-0.00038449,0.000405018,8.76458e-05};
 
-    double min_fcn = 0.0;
-    MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, true_shift, flag);
-    std::cout << std::setprecision(10) << "FCN(true_shift) = " << min_fcn << "\n";
-    min_fcn = 0.0;
-    MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, calc_shift, flag);
-    std::cout << std::setprecision(10) << "FCN(calc_shift) = " << min_fcn << "\n";
-
-    return false;
+    // double min_fcn = 0.0;
+    // MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, true_shift, flag);
+    // std::cout << std::setprecision(10) << "FCN(true_shift) = " << min_fcn << "\n";
+    // min_fcn = 0.0;
+    // MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, calc_shift, flag);
+    // std::cout << std::setprecision(10) << "FCN(calc_shift) = " << min_fcn << "\n";
 
     bool try_again = false;
 
@@ -986,7 +984,6 @@ bool MuonResidualsGPRFitter::Fit()
 
 void MuonResidualsGPRFitter::PlotFCN(int grid_size, std::vector<double> const& lows, std::vector<double> const& highs)
 {
-    // assert(lows.size() == highs.size() && lows.size() == npar());
     MuonResidualsGPRFitterFitInfo* fitinfo = new MuonResidualsGPRFitterFitInfo(this);
 
     // configure Minuit object
@@ -1019,10 +1016,12 @@ void MuonResidualsGPRFitter::PlotFCN(int grid_size, std::vector<double> const& l
     std::vector<double> vec_grad(npar(), 0.0);
     double* grad = vec_grad.data();
 
-    // int ndim = npar();
-    // double par[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    // int flag = 1;
-    // MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, fcn_zero, par, flag);
+    if (fcn_zero == 0.0)
+    {
+        double par[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        int flag = 1;
+        MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, fcn_zero, par, flag);
+    }
 
     // 2d plotting
     std::string name = "graph2d_";
@@ -1381,9 +1380,8 @@ void MuonResidualsGPRFitter::SaveResidDistr() const
     tFile->Close();
 }
 
-void MuonResidualsGPRFitter::MakeContourPlots()
+void MuonResidualsGPRFitter::PlotContours(int n_points)
 {
-    std::cout << "Making contour plots\n";
     MuonResidualsGPRFitterFitInfo* fitinfo = new MuonResidualsGPRFitterFitInfo(this);
     TMinuit* MuonResidualsGPRFitter_TMinuit = new TMinuit(npar());
     MuonResidualsGPRFitter_TMinuit->SetPrintLevel(-1);
@@ -1398,45 +1396,50 @@ void MuonResidualsGPRFitter::MakeContourPlots()
         MuonResidualsGPRFitter_TMinuit->DefineParameter(i, par_names[i], 0.0, 0.000001, 0.0, 0.0);
     }
 
-    int n_points = 10;
-    for(int i = 0; i < 6; ++i)
+    std::unique_ptr<TFile> file = std::make_unique<TFile>("contour_plots.root", "RECREATE");
+    std::unique_ptr<TStyle> gStyle = std::make_unique<TStyle>();
+
+    for(int i = 0; i < ndim; ++i)
     {
-        for (int j = i + 1; j < 6; ++j)
+        for (int j = i + 1; j < ndim; ++j)
         {
-            std::cout << "\tNow making " << par_names[i] << " vs " << par_names[j] << " contours\n";
             std::unique_ptr<TCanvas> canvas = std::make_unique<TCanvas>("c", "c", 600, 450);
-            MuonResidualsGPRFitter_TMinuit->SetErrorDef(25);
-            TGraph* graph1 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
-            MuonResidualsGPRFitter_TMinuit->SetErrorDef(16);
-            TGraph* graph2 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
             MuonResidualsGPRFitter_TMinuit->SetErrorDef(9);
-            TGraph* graph3 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+            TGraph* graph1 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
             MuonResidualsGPRFitter_TMinuit->SetErrorDef(4);
-            TGraph* graph4 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+            TGraph* graph2 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
             MuonResidualsGPRFitter_TMinuit->SetErrorDef(1);
-            TGraph* graph5 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+            TGraph* graph3 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+            // MuonResidualsGPRFitter_TMinuit->SetErrorDef(25);
+            // TGraph* graph4 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+            // MuonResidualsGPRFitter_TMinuit->SetErrorDef(16);
+            // TGraph* graph5 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
 
             graph1->GetXaxis()->SetTitle(par_names[i]);
             graph1->GetYaxis()->SetTitle(par_names[j]);
-            graph1->SetLineColor(kRed);
-            graph2->SetLineColor(kBlue);
-            graph3->SetLineColor(kGreen);
-            graph4->SetLineColor(kMagenta);
-            graph5->SetLineColor(kBlack);
+            graph1->SetLineColor(kBlue);
+            graph2->SetLineColor(kGreen);
+            graph3->SetLineColor(kRed);
+            // graph4->SetLineColor(kMagenta);
+            // graph5->SetLineColor(kBlack);
             graph1->SetTitle(Form("Parameter contour %s vs %s", par_names[i], par_names[j]));
             graph1->Draw();
+            file->WriteObject(graph1, Form("3sig_cnt_%s_%s", par_names[i], par_names[j]));
             graph2->Draw("same");
+            file->WriteObject(graph2, Form("2sig_cnt_%s_%s", par_names[i], par_names[j]));
             graph3->Draw("same");
-            graph4->Draw("same");
-            graph5->Draw("same");
-            canvas->SaveAs(Form("likelihood_plot_%s_%s.pdf", par_names[i], par_names[j]));
+            file->WriteObject(graph3, Form("1sig_cnt_%s_%s", par_names[i], par_names[j]));
+            // graph4->Draw("same");
+            // graph5->Draw("same");
+            // canvas->SaveAs(Form("likelihood_plot_%s_%s.pdf", par_names[i], par_names[j]));
         }
     }
+
+    file->Close();
 }
 
 void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 {
-    // std::cout << std::boolalpha;
     MuonResidualsGPRFitterFitInfo* fitinfo = new MuonResidualsGPRFitterFitInfo(this);
     TMinuit* MuonResidualsGPRFitter_TMinuit = new TMinuit(npar());
     MuonResidualsGPRFitter_TMinuit->SetPrintLevel(-1);
@@ -1461,7 +1464,6 @@ void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 
     MuonResidualsGPRFitter_TMinuit->SetErrorDef(1);
     TGraph* g1 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
-    // std::cout << "g1: " << (g1 == nullptr) << "\n";
     g1->SetLineColor(kRed);
     g1->SetLineWidth(3);
     g1->SetTitle("1 sig");
@@ -1469,7 +1471,6 @@ void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 
     MuonResidualsGPRFitter_TMinuit->SetErrorDef(4);
     TGraph* g2 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
-    // std::cout << "g2: " << (g2 == nullptr) << "\n";
     g2->SetLineColor(kGreen);
     g2->SetLineWidth(3);
     g2->SetTitle("2 sig");
@@ -1477,20 +1478,17 @@ void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 
     MuonResidualsGPRFitter_TMinuit->SetErrorDef(9);
     TGraph* g3 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
-    // std::cout << "g3: " << (g3 == nullptr) << "\n";
     g3->SetLineColor(kBlue);
     g3->SetLineWidth(3);
     g3->SetTitle("3 sig");
     g3->SetDrawOption("AL");
 
-    // auto m = std::make_unique<TMarker>(true_shifts[p1idx], true_shifts[p2idx], 104);
     TGraph* m = new TGraph();
     m->AddPoint(-true_shifts[p1idx], -true_shifts[p2idx]);
     m->SetMarkerStyle(104);
     m->SetMarkerColor(1);
     m->SetMarkerSize(3);
     m->SetDrawOption("AP");
-    // m->Draw("same");
 
     mg->Add(g1);
     mg->Add(g2);

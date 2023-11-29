@@ -959,25 +959,6 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
 }
 
 void MuonAlignmentFromReference::fitAndAlign() {
-  // std::cout << "Positions of chambers in global frame before local alignment:\n";
-  // for (auto const& ali: m_alignables) 
-  // {
-  //     DetId id = ali->geomDetId();
-  //     if (id.subdetId() == MuonSubdetId::CSC)
-  //     {
-  //       CSCDetId cscId(id.rawId());
-  //       // align::RotationType const& orientation = ali->globalRotation();
-  //       align::PositionType const& position = ali->globalPosition();
-  //       std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-  //       // std::cout << orientation << "\n";
-  //       std::cout << "ali->globalPosition():\n";
-  //       std::cout << position << "\n";
-  //       std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
-  //       auto pos = m_cscGeometry->idToDet(id)->position();
-  //       std::cout << pos << "\n";
-  //       std::cout << "--------------------------------------" << "\n";
-  //     }
-  // }
   bool m_debug = false;
   using namespace std::chrono;
 
@@ -1613,22 +1594,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
             if (align_phiz)
               params[paramIndex[5]] = deltaphiz_value;
           }
-
-          // collect info about local alignment in station 1 wheel 0
-          // DetId thisId = thisali->geomDetId();
-          // if (thisId.subdetId() == MuonSubdetId::DT)
-          // {
-          //   DTChamberId thisDtId(thisId.rawId());
-          //   if (thisDtId.wheel() == 0 && thisDtId.station() == 1)
-          //   {
-          //     w0st1 << "chamber " << thisDtId.sector() << "\n";
-          //     w0st1 << "params: " << deltax_value << " " << deltay_value << " " << deltaz_value << " " 
-          //                         << deltaphix_value << " " << deltaphiy_value << " " << deltaphiz_value << "\n";
-          //     w0st1 << "errors: " << deltax_error << " " << deltay_error << " " << deltaz_error << " " 
-          //                         << deltaphix_error << " " << deltaphiy_error << " " << deltaphiz_error << "\n";
-          //     w0st1 << "---------------------------------------------------------------\n";
-          //   }
-          // }
         }  // end if 6DOF
 
         else if (fitter->second->type() == MuonResidualsFitter::k6DOFrphi) {
@@ -1843,57 +1808,6 @@ void MuonAlignmentFromReference::fitAndAlign() {
   auto duration = duration_cast<milliseconds>(stop - start);
   tracer << "Local Alignment done!\n";
   tracer << "Local Alignment took " << duration.count() << " ms\n";
-
-  // w0st1.close();
-
-  // std::ofstream local_ali_file_e1("endcap1_local_alignment_file.txt");
-  // std::ofstream local_ali_file_e2("endcap2_local_alignment_file.txt");
-  // std::ofstream local_ali_file_dt("dt_local_alignment.txt");
-  // std::cout << "Positions of chambers in global frame after local alignment:\n";
-  // for (auto const& ali: m_alignables) 
-  // {
-  //     DetId id = ali->geomDetId();
-  //     if (id.subdetId() == MuonSubdetId::CSC)
-  //     {
-  //       CSCDetId cscId(id.rawId());
-  //       if (cscId.endcap() == 1)
-  //       {
-  //         align::RotationType const& orientation = ali->globalRotation();
-  //         align::PositionType const& position = ali->globalPosition();
-  //         local_ali_file_e1 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-  //         local_ali_file_e1 << position << "\n";
-  //         local_ali_file_e1 << orientation << "\n";
-  //       }
-  //       else if (cscId.endcap() == 2)
-  //       {
-  //         align::RotationType const& orientation = ali->globalRotation();
-  //         align::PositionType const& position = ali->globalPosition();
-  //         local_ali_file_e2 << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-  //         local_ali_file_e2 << position << "\n";
-  //         local_ali_file_e2 << orientation << "\n";
-  //       }
-  //       // std::cout << "chamber " << cscId.endcap() << "/" << cscId.ring() << "/" << cscId.station() << "/" << cscId.chamber() << ": " << "\n";
-  //       // std::cout << orientation << "\n";
-  //       // std::cout << "ali->globalPosition():\n";
-  //       // std::cout << position << "\n";
-  //       // std::cout << "m_CSCGeometry->idToDet(id)->position():\n";
-  //       // auto pos = m_cscGeometry->idToDet(id)->position();
-  //       // std::cout << pos << "\n";
-  //       std::cout << "--------------------------------------" << "\n";
-  //     }
-  //     else if (id.subdetId() == MuonSubdetId::DT)
-  //     {
-  //       DTChamberId dtId(id.rawId());
-  //       align::RotationType const& orientation = ali->globalRotation();
-  //       align::PositionType const& position = ali->globalPosition();
-  //       local_ali_file_dt << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-  //       local_ali_file_dt << position << "\n";
-  //       local_ali_file_dt << orientation << "\n";
-  //     }
-  // }
-  // local_ali_file_e1.close();
-  // local_ali_file_e2.close();
-  // local_ali_file_dt.close();
 
   tracer << "residual counts: " << "\n";
   tracer << "---- total: " << resid_count << "\n";
@@ -2262,11 +2176,13 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   // std::vector<double> highs{ -0.125478,0.522478,0.247467,-0.0003528,0.0004543,8.588591e-05 };
 
   // 30% from true value
-  std::vector<double> highs{ -0.097593, 0.617474, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
-  std::vector<double> lows{ -0.181245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
-  int nPt = 50;
+  // std::vector<double> highs{ -0.097593, 0.617474, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
+  // std::vector<double> lows{ -0.181245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
+  // int nPt = 50;
 
-  GPRFitter.PlotFCN(nPt, lows, highs);
+  // GPRFitter.PlotFCN(nPt, lows, highs);
+
+  GPRFitter.PlotContours();
 
   if (m_debug)
   {
