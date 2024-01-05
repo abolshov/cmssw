@@ -878,13 +878,13 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
   }
 
   // select residuals peaks and discard tails if peakNSigma>0 (only while doing alignment)
-  if (m_peakNSigma > 0. && m_doAlignment) {
-    stop_watch.Start();
-    selectResidualsPeaks();
-    if (m_debug)
-      std::cout << "selectResidualsPeaks took " << stop_watch.CpuTime() << " sec" << std::endl;
-    stop_watch.Stop();
-  }
+  // if (m_peakNSigma > 0. && m_doAlignment) {
+  //   stop_watch.Start();
+  //   selectResidualsPeaks();
+  //   if (m_debug)
+  //     std::cout << "selectResidualsPeaks took " << stop_watch.CpuTime() << " sec" << std::endl;
+  //   stop_watch.Stop();
+  // }
 
   if (m_BFieldCorrection > 0 && m_doAlignment) {
     stop_watch.Start();
@@ -943,13 +943,13 @@ void MuonAlignmentFromReference::terminate(const edm::EventSetup& iSetup) {
   }
 
   // fit and align (time-consuming, so the user can turn it off if in a residuals-gathering job)
-  if (false) {
-    stop_watch.Start();
-    fitAndAlign();
-    if (m_debug)
-      std::cout << "fitAndAlign took " << stop_watch.CpuTime() << " sec" << std::endl;
-    stop_watch.Stop();
-  }
+  // if (m_doAlignment) {
+  //   stop_watch.Start();
+  //   fitAndAlign();
+  //   if (m_debug)
+  //     std::cout << "fitAndAlign took " << stop_watch.CpuTime() << " sec" << std::endl;
+  //   stop_watch.Stop();
+  // }
 
   // write out the pseudontuples for a later job to collect
   if (m_writeTemporaryFile != std::string(""))
@@ -1149,6 +1149,10 @@ void MuonAlignmentFromReference::fitAndAlign() {
       wheel_counts[dtId.wheel()] += nNeg;
       dt_station_counts[dtId.station()] += nPos;
       dt_station_counts[dtId.station()] += nNeg;
+
+      // if (dtId.wheel() != -2) continue;
+      // if (dtId.station() != 1) continue;
+      // if (dtId.sector() != 7 ) continue;
     }
     if (Id.subdetId() == MuonSubdetId::CSC)
     {
@@ -1593,6 +1597,18 @@ void MuonAlignmentFromReference::fitAndAlign() {
               params[paramIndex[4]] = deltaphiy_value;
             if (align_phiz)
               params[paramIndex[5]] = deltaphiz_value;
+
+            if (Id.subdetId() == MuonSubdetId::DT)
+            {
+              DTChamberId dtId(Id.rawId());
+              std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << "\n";
+              std::cout << deltax_value << "\n"
+                        << deltay_value << "\n"
+                        << deltaz_value << "\n"
+                        << deltaphix_value << "\n"
+                        << deltaphiy_value << "\n"
+                        << deltaphiz_value << "\n";
+            }
           }
         }  // end if 6DOF
 
@@ -1881,88 +1897,105 @@ void MuonAlignmentFromReference::test()
   // std::random_device rd;
   // std::uniform_real_distribution<double> dist(0.0000001, 0.01);
 
+  std::ofstream file("misaligned.txt");
+
   for (auto const& ali: m_alignables) 
   {
-      DetId id = ali->geomDetId();
-      if (id.subdetId() == MuonSubdetId::DT)
-      {
-        DTChamberId dtId(id.rawId());
-        if (dtId.wheel() == 2 && dtId.station() == 2 && dtId.sector() == 4)
-        {
-          std::unique_ptr<TFile> tFile = std::make_unique<TFile>("resid.root", "recreate");
-          std::unique_ptr<TTree> tTree = std::make_unique<TTree>("residTree", "residTree");
+    DetId id = ali->geomDetId();
+    if (id.subdetId() == MuonSubdetId::DT)
+    {
+      DTChamberId dtId(id.rawId());
+      int wheel = dtId.wheel();
+      int station = dtId.station();
+      int sector = dtId.sector();
+      Surface::RotationType orientation = m_dtGeometry->idToDet(id)->rotation();
+      Surface::PositionType position = m_dtGeometry->idToDet(id)->position();
 
-          Double_t residX, residY, residSlopeX, residSlopeY;
+      file << "chamber " << wheel << "/" << station << "/" << sector << ":\n";
+      file << orientation << "\n";
+      file << position << "\n";
+      file << "--------------------------\n";
 
-          tTree->Branch("residX", &residX, "residX/D");
-          tTree->Branch("residY", &residY, "residY/D");
-          tTree->Branch("residSlopeX", &residSlopeX, "residSlopeX/D");
-          tTree->Branch("residSlopeY", &residSlopeY, "residSlopeY/D");
+      // if (dtId.wheel() == 2 && dtId.station() == 2 && dtId.sector() == 4)
+      // {
+      //   std::unique_ptr<TFile> tFile = std::make_unique<TFile>("resid.root", "recreate");
+      //   std::unique_ptr<TTree> tTree = std::make_unique<TTree>("residTree", "residTree");
 
-          std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator fitter = m_fitters.find(ali);
+      //   Double_t residX, residY, residSlopeX, residSlopeY;
 
-          for (std::vector<double*>::const_iterator it = fitter->second->residualsPos_begin(); it != fitter->second->residualsPos_end(); ++it)
-          {
-            residX = (*it)[MuonResiduals6DOFFitter::kResidX];
-            residY = (*it)[MuonResiduals6DOFFitter::kResidY];
-            residSlopeX = (*it)[MuonResiduals6DOFFitter::kResSlopeX];
-            residSlopeY = (*it)[MuonResiduals6DOFFitter::kResSlopeY];
-            tTree->Fill();
-          }
+      //   tTree->Branch("residX", &residX, "residX/D");
+      //   tTree->Branch("residY", &residY, "residY/D");
+      //   tTree->Branch("residSlopeX", &residSlopeX, "residSlopeX/D");
+      //   tTree->Branch("residSlopeY", &residSlopeY, "residSlopeY/D");
 
-          tFile->Write();
-          tFile->Close();
+      //   std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator fitter = m_fitters.find(ali);
 
-          // align::RotationType const& orientation = ali->globalRotation();
-          // std::cout << "orientation.xy() = " << orientation.xy() << "\n";
-          // align::PositionType const& position = ali->globalPosition();
-          // std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
-          // std::cout << "orientation:\n" << orientation << "\n";
-          // auto prod = orientation*orientation.transposed();
-          // std::cout << "product:\n" << prod << "\n";
-          // align::EulerAngles const& rotAngles = align::toAngles(orientation);
-          // float dphix = rotAngles[0];
+      //   for (std::vector<double*>::const_iterator it = fitter->second->residualsPos_begin(); it != fitter->second->residualsPos_end(); ++it)
+      //   {
+      //     residX = (*it)[MuonResiduals6DOFFitter::kResidX];
+      //     residY = (*it)[MuonResiduals6DOFFitter::kResidY];
+      //     residSlopeX = (*it)[MuonResiduals6DOFFitter::kResSlopeX];
+      //     residSlopeY = (*it)[MuonResiduals6DOFFitter::kResSlopeY];
+      //     tTree->Fill();
+      //   }
 
-          // construct matrix of rotation in global frame from angles of rotation about global axes
-          // align::EulerAngles angles(3);
-          // angles[0] = 0.0;
-          // angles[1] = 0.005;
-          // angles[2] = 0.0;
-          // align::RotationType mat = align::toMatrix(angles);
-          // std::cout << "mat:\n" << mat << "\n";
+      //   tFile->Write();
+      //   tFile->Close();
 
-          // transform the matrix above to local fram of the chamber an extrac angles of rotation about local axes
-          // align::EulerAngles angles1 = align::toAngles(orientation*mat*orientation.transposed()); // this is the correct way!
-          // align::EulerAngles angles2 = align::toAngles(orientation.transposed()*mat*orientation);
-          // std::cout << "angles1:\n" << angles1 << "\n";
-          // std::cout << "angles2:\n" << angles2 << "\n";
+      //   // align::RotationType const& orientation = ali->globalRotation();
+      //   // std::cout << "orientation.xy() = " << orientation.xy() << "\n";
+      //   // align::PositionType const& position = ali->globalPosition();
+      //   // std::cout << "chamber " << dtId.wheel() << "/" << dtId.station() << "/" << dtId.sector() << ": " << "\n";
+      //   // std::cout << "orientation:\n" << orientation << "\n";
+      //   // auto prod = orientation*orientation.transposed();
+      //   // std::cout << "product:\n" << prod << "\n";
+      //   // align::EulerAngles const& rotAngles = align::toAngles(orientation);
+      //   // float dphix = rotAngles[0];
 
-          // align::EulerAngles globAngles(3);
-          // for (size_t i = 0; i < 100; ++i)
-          // {
-          //   globAngles[0] = dist(rd);
-          //   globAngles[1] = dist(rd);
-          //   globAngles[2] = dist(rd);
-          //   align::RotationType mtrx = align::toMatrix(globAngles);
-          //   align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
-          //   GlobalVector gRotVec = GlobalVector(globAngles[0], globAngles[1], globAngles[2]);
-          //   LocalVector lRotVec = m_dtGeometry->idToDet(id)->toLocal(gRotVec);
-          //   std::cout << locAngles[0]/lRotVec.x() << "\n"
-          //             << locAngles[1]/lRotVec.y() << "\n"
-          //             << locAngles[2]/lRotVec.z() << "\n"
-          //             << "----------------------------\n";
-            
-          // }
+      //   // construct matrix of rotation in global frame from angles of rotation about global axes
+      //   // align::EulerAngles angles(3);
+      //   // angles[0] = 0.0;
+      //   // angles[1] = 0.005;
+      //   // angles[2] = 0.0;
+      //   // align::RotationType mat = align::toMatrix(angles);
+      //   // std::cout << "mat:\n" << mat << "\n";
 
-          // std::cout << "in local 1:\n" << orientation*mat*orientation.transposed() << "\n";
-          // std::cout << "in local 2:\n" << orientation.transposed()*mat*orientation << "\n";
-          // std::cout << "mat.transposed():\n" << mat.transposed() << "\n";
-          // std::cout << rotAngles[0] << " " << rotAngles[1] << " " << rotAngles[2] << "\n";
-          // std::cout << position << "\n";
-          // std::cout << "--------------------------------------" << "\n";
-        }
-      }
+      //   // transform the matrix above to local fram of the chamber an extrac angles of rotation about local axes
+      //   // align::EulerAngles angles1 = align::toAngles(orientation*mat*orientation.transposed()); // this is the correct way!
+      //   // align::EulerAngles angles2 = align::toAngles(orientation.transposed()*mat*orientation);
+      //   // std::cout << "angles1:\n" << angles1 << "\n";
+      //   // std::cout << "angles2:\n" << angles2 << "\n";
+
+      //   // align::EulerAngles globAngles(3);
+      //   // for (size_t i = 0; i < 100; ++i)
+      //   // {
+      //   //   globAngles[0] = dist(rd);
+      //   //   globAngles[1] = dist(rd);
+      //   //   globAngles[2] = dist(rd);
+      //   //   align::RotationType mtrx = align::toMatrix(globAngles);
+      //   //   align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
+      //   //   GlobalVector gRotVec = GlobalVector(globAngles[0], globAngles[1], globAngles[2]);
+      //   //   LocalVector lRotVec = m_dtGeometry->idToDet(id)->toLocal(gRotVec);
+      //   //   std::cout << locAngles[0]/lRotVec.x() << "\n"
+      //   //             << locAngles[1]/lRotVec.y() << "\n"
+      //   //             << locAngles[2]/lRotVec.z() << "\n"
+      //   //             << "----------------------------\n";
+          
+      //   // }
+
+      //   // std::cout << "in local 1:\n" << orientation*mat*orientation.transposed() << "\n";
+      //   // std::cout << "in local 2:\n" << orientation.transposed()*mat*orientation << "\n";
+      //   // std::cout << "mat.transposed():\n" << mat.transposed() << "\n";
+      //   // std::cout << rotAngles[0] << " " << rotAngles[1] << " " << rotAngles[2] << "\n";
+      //   // std::cout << position << "\n";
+      //   // std::cout << "--------------------------------------" << "\n";
+      // }
+
+    }
   }
+
+  file.close();
+
 }
 
 void MuonAlignmentFromReference::doGlobalAlignment()
@@ -1971,7 +2004,7 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   using namespace std::chrono;
   // configure GPR fitter
   std::vector<std::string> options{ m_DTWheels, m_DTStations, m_CSCEndcaps, m_CSCRings, m_CSCStations };
-  MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, m_fitters, options);
+  MuonResidualsGPRFitter GPRFitter(m_dtGeometry, m_cscGeometry, options);
 
   if (m_doCSC && !m_doDT && m_CSCEndcaps == "11")
   {
@@ -1988,6 +2021,8 @@ void MuonAlignmentFromReference::doGlobalAlignment()
 
     Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
     Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
+    GPRFitter.CalcStats();
 
     std::ofstream file;
     file.open("gpr_params.csv");
@@ -2064,6 +2099,17 @@ void MuonAlignmentFromReference::doGlobalAlignment()
 
     Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
     Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
+
+    GPRFitter.CalcStats();
+    // std::cout << "=======================================\n";
+    // for (auto it = GPRFitter.DataBegin(); it != GPRFitter.DataEnd(); ++ it)
+    // {
+    //   auto const& [id, resid_vec] = *it;
+    //   std::vector<double> sigmas = GPRFitter.GetStdDev(id);
+    //   std::copy(sigmas.begin(), sigmas.end(), std::ostream_iterator<double>(std::cout, " "));
+    //   std::cout << "\n";
+    // }
+    // return;
 
     std::ofstream file;
     file.open("gpr_params.csv");
@@ -2175,14 +2221,30 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   // std::vector<double> lows{ -0.153362,0.427482,0.202473,-0.0004312,0.0003717,7.027029e-05 };
   // std::vector<double> highs{ -0.125478,0.522478,0.247467,-0.0003528,0.0004543,8.588591e-05 };
 
-  // 30% from true value
+  // // 30% from true value
   // std::vector<double> highs{ -0.097593, 0.617474, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
-  // std::vector<double> lows{ -0.181245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
-  // int nPt = 50;
+  // std::vector<double> lows{ -0.131245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
+  // int nPt = 25;
+
+  // std::vector<double> highs{ -0.13, 0.5, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
+  // std::vector<double> lows{ -0.23, 0.2, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
+  // int nPt = 25;
+
+  // 50% from true value
+  // std::vector<double> highs{ -0.06971, 0.71247, 0.337455, -0.000196, 0.0006195, 11.711715e-05 };
+  // std::vector<double> lows{ -0.20913, 0.23749, 0.112485, -0.000588, 0.0002065, 3.903905e-05 };
+  // int nPt = 20;
+
+  // std::vector<double> lows{ -0.1, -0.1, -0.1, -0.002, 0.001, -0.004};
+  // std::vector<double> highs{ 0.1, 0.1, 0.1, 0.0, 0.003, -0.002 };
 
   // GPRFitter.PlotFCN(nPt, lows, highs);
+  // GPRFitter.PlotContours("123", 12);
 
-  GPRFitter.PlotContours();
+  // GPRFitter.SaveResidPeakDistr({0.0, 0.0, 0.0, -0.001, 0.002, -0.003});
+  // GPRFitter.SaveResidDistr();
+
+  // GPRFitter.Print(6);
 
   if (m_debug)
   {

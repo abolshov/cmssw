@@ -31,16 +31,11 @@
 #include <limits>
 #include <random>
 
-// struct NewMinuit : public TMinuit 
-// {
-//     inline void Foo() const { std::cout << "Foo!\n"; }
-// };
-
-// #ifdef STANDALONE_FITTER
-// #include "MuonResidualsFitter.h"
-// #else
-// #include "Alignment/MuonAlignmentAlgorithms/interface/MuonResidualsFitter.h"
-// #endif
+struct ResidStats
+{
+    std::vector<double> means;
+    std::vector<double> stddevs;
+};
 
 class MuonResidualsGPRFitter {
 public:
@@ -90,61 +85,44 @@ public:
     };
 
     MuonResidualsGPRFitter();
-    MuonResidualsGPRFitter(DTGeometry const* DTGeom, 
-                           CSCGeometry const* CSCGeom,
-                           std::map<Alignable*, MuonResidualsTwoBin*> const& data, 
-                           std::vector<std::string> const& opt);
+    MuonResidualsGPRFitter(DTGeometry const* DTGeom, CSCGeometry const* CSCGeom, std::vector<std::string> const& opt);
     ~MuonResidualsGPRFitter();
-    // ~MuonResidualsGPRFitter() = default;
 
     MuonResidualsGPRFitter(MuonResidualsGPRFitter const& other) = delete;
     MuonResidualsGPRFitter& operator=(MuonResidualsGPRFitter const& other) = delete;
     MuonResidualsGPRFitter(MuonResidualsGPRFitter&& other) = delete;
     MuonResidualsGPRFitter& operator=(MuonResidualsGPRFitter&& other) = delete;
 
-    size_t NTypesOfResid(Alignable const* ali) const;
-    size_t NTypesOfResid(DetId const& id) const;
-
     inline void SetPrintLevel(int printLevel) { m_printLevel = printLevel; }
     inline void SetStrategy(int strategy) { m_strategy = strategy; }
     void SetOptions(std::vector<std::string> const& options); 
     void SetOption(size_t optId, std::string const& option);
-
     inline double loglikelihood() const { return m_loglikelihood; }
-
-    //returns number of parameters to be fitted
     inline int npar() const { return static_cast<int>(PARAMS::kCount); }
 
     // methods to access residuals
-    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_begin() const { return m_datamap.begin(); } // prepare for removal
-    std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator datamap_end() const { return m_datamap.end(); } // prepare for removal
     inline std::unordered_map<DetId, std::vector<double*>>::const_iterator DataBegin() const { return m_data.cbegin(); }
     inline std::unordered_map<DetId, std::vector<double*>>::const_iterator DataEnd() const { return m_data.cend(); }
     inline std::vector<double*>::const_iterator ResidualsBegin(DetId const& id) const { return m_data.at(id).cbegin(); }
     inline std::vector<double*>::const_iterator ResidualsEnd(DetId const& id) const { return m_data.at(id).cend(); }
-    inline bool Empty() const { return m_datamap.empty(); } // prepare for removal
     inline bool IsEmpty() const { return m_data.empty(); }
-
-    // method filling pairs (or const_iterator) to m_datamap
-    void Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it); // prepare for removal
-    inline void SetData(std::map<Alignable*, MuonResidualsTwoBin*> const& datamap) { m_datamap = datamap; } // prepare for removal
     void CopyData(std::map<Alignable*, MuonResidualsTwoBin*> const& from, double fraction = 1.0);
-    void ReleaseData();
-
-    int TrackCount() const;
 
     // checks if chamber is seleced for alignment
     bool Select(DetId const& id) const;
 
-    //returns number of all residuals
-    inline size_t Size() const { return m_datamap.size(); } // prepare for removal
+    void ReleaseData();
+    void CalcStats();
+    int TrackCount() const;
     inline size_t NumberOfChambers() const { return m_data.size(); }
+    size_t NTypesOfResid(DetId const& id) const;
+    size_t NTypesOfResid(Alignable const* ali) const;
 
-    //returns GPR parameter by given index
     inline double GetParamValue(int index) const { return m_value.at(index); }
-
-    //returns param error
     inline double GetParamError(int index) const { return m_error.at(index); }
+    // inline std::vector<double> GetStdDev(DetId id) const { return m_stddevs.at(id); } 
+    inline std::vector<double> GetStdDevs(DetId id) const { return m_stats.at(id).stddevs; } 
+    inline std::vector<double> GetMeans(DetId id) const { return m_stats.at(id).means; } 
 
     // geometry get/set
     inline DTGeometry const* GetDTGeometry() const { return m_DTGeometry; }
@@ -154,13 +132,14 @@ public:
 
     // debugging tools
     void Print(int nValues, DetId const& id) const;
-    void Print(int nValues, Alignable* ali) const; // remove
+    void Print(int nValues) const;
     void SaveResidDistr() const;
-    void PlotContours(int n_points = 16);
-    void PlotContour(PARAMS par1, PARAMS par2, int n_points = 16);
+    void SaveResidPeakDistr(std::vector<double> const& params) const;
     void PlotFCN(int grid_size = 50, 
                  std::vector<double> const& lows = { -0.2, -0.2, -0.2, -0.02, -0.02, -0.02 }, 
                  std::vector<double> const& highs = { 0.2, 0.2, 0.2, 0.02, 0.02, 0.02 });
+    void PlotContours(std::string selection, int n_points = 16); 
+    void PlotContour(PARAMS par1, PARAMS par2, int n_points = 16); // add try-catch to Contour call
 
     // wrapper-function for only configuring and preparing parameters passed to dofit
     bool Fit();
@@ -180,9 +159,10 @@ private:
     // TMatrixDSym m_cov;
     double m_loglikelihood;
 
-    // map store all pairs alignable chamber - TwoBin with residuals for this chamber
-    std::map<Alignable*, MuonResidualsTwoBin*> m_datamap; // prepare for removal
+    // Data is stored in pairs [DetId, arrays of residuals]
     std::unordered_map<DetId, std::vector<double *>> m_data;
+    // std::unordered_map<DetId, std::vector<double>> m_stddevs;
+    std::unordered_map<DetId, ResidStats> m_stats;
 
     // encode which chambers to select for alignment
     enum Options { DTWheels, DTStations, CSCEndcaps, CSCRings, CSCStations, OptCount };
@@ -222,5 +202,4 @@ private:
 
 double MuonResidualsGPRFitter_logPureGaussian(double residual, double center, double sigma);
 
-// #endif  // Alignment_MuonAlignmentAlgorithms_MuonResidualsGPRFitter_H
 #endif //MUON_RESIDUALS_GPR_FITTER_H

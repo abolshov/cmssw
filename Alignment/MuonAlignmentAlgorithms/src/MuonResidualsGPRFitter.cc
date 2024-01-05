@@ -44,7 +44,6 @@ static TMinuit* MuonResidualsGPRFitter_TMinuit;
 static double fcn_zero = 0.0;
 static double avg_call_duration = 0.0;
 static int call_id = 0;
-// extern void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int iflag);
 
 using DT_6DOF = MuonResidualsGPRFitter::DataDT_6DOF;
 using DT_5DOF = MuonResidualsGPRFitter::DataDT_5DOF;
@@ -54,103 +53,6 @@ using PARAMS = MuonResidualsGPRFitter::PARAMS;
 namespace 
 {
     TMinuit* minuit;
-
-    // functions to calculate DT residuals
-    double residual_x(double delta_x,
-                      double delta_y,
-                      double delta_z,
-                      double delta_phix,
-                      double delta_phiy,
-                      double delta_phiz,
-                      double track_x,
-                      double track_y,
-                      double track_dxdz,
-                      double track_dydz,
-                      double alphax,
-                      double residual_dxdz) {
-           return delta_x - track_dxdz * delta_z - track_y * track_dxdz * delta_phix + track_x * track_dxdz * delta_phiy -
-           track_y * delta_phiz + residual_dxdz * alphax;
-    }
-
-    double residual_y(double delta_x,
-                      double delta_y,
-                      double delta_z,
-                      double delta_phix,
-                      double delta_phiy,
-                      double delta_phiz,
-                      double track_x,
-                      double track_y,
-                      double track_dxdz,
-                      double track_dydz,
-                      double alphay,
-                      double residual_dydz) {
-           return delta_y - track_dydz * delta_z - track_y * track_dydz * delta_phix + track_x * track_dydz * delta_phiy +
-           track_x * delta_phiz + residual_dydz * alphay;
-    }
-
-    double residual_dxdz(double delta_x,
-                         double delta_y,
-                         double delta_z,
-                         double delta_phix,
-                         double delta_phiy,
-                         double delta_phiz,
-                         double track_x,
-                         double track_y,
-                         double track_dxdz,
-                         double track_dydz) {
-           return -track_dxdz * track_dydz * delta_phix + (1. + track_dxdz * track_dxdz) * delta_phiy -
-           track_dydz * delta_phiz;
-    }
-
-    double residual_dydz(double delta_x,
-                         double delta_y,
-                         double delta_z,
-                         double delta_phix,
-                         double delta_phiy,
-                         double delta_phiz,
-                         double track_x,
-                         double track_y,
-                         double track_dxdz,
-                         double track_dydz) {
-           return -(1. + track_dydz * track_dydz) * delta_phix + track_dxdz * track_dydz * delta_phiy +
-           track_dxdz * delta_phiz;
-    }
-
-    // functions to calculate CSC residuals
-    double getResidual(double delta_x,
-                       double delta_y,
-                       double delta_z,
-                       double delta_phix,
-                       double delta_phiy,
-                       double delta_phiz,
-                       double track_x,
-                       double track_y,
-                       double track_dxdz,
-                       double track_dydz,
-                       double R,
-                       double alpha,
-                       double resslope) 
-    {
-        return delta_x - (track_x / R - 3.0 * pow(track_x / R, 3)) * delta_y - track_dxdz * delta_z -
-            track_y * track_dxdz * delta_phix + track_x * track_dxdz * delta_phiy - track_y * delta_phiz +
-            resslope * alpha;
-    }
-
-    double getResSlope(double delta_x,
-                       double delta_y,
-                       double delta_z,
-                       double delta_phix,
-                       double delta_phiy,
-                       double delta_phiz,
-                       double track_x,
-                       double track_y,
-                       double track_dxdz,
-                       double track_dydz,
-                       double R) 
-    {
-        return -track_dxdz / 2. / R * delta_y + (track_x / R - track_dxdz * track_dydz) * delta_phix +
-            (1.0 + track_dxdz * track_dxdz) * delta_phiy - track_dydz * delta_phiz;
-    }
 }
 
 double MuonResidualsGPRFitter_logPureGaussian(double residual, double center, double sigma) 
@@ -169,10 +71,7 @@ MuonResidualsGPRFitter::MuonResidualsGPRFitter()
       m_error(npar(), 0.0),
       m_loglikelihood(0.0) {}
 
-MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* DTGeom, 
-                                               CSCGeometry const* CSCGeom, 
-                                               std::map<Alignable*, MuonResidualsTwoBin*> const& data,
-                                               std::vector<std::string> const& opt)
+MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* DTGeom, CSCGeometry const* CSCGeom, std::vector<std::string> const& opt)
     : m_DTGeometry(DTGeom),
       m_CSCGeometry(CSCGeom),
       m_printLevel(0),
@@ -180,7 +79,6 @@ MuonResidualsGPRFitter::MuonResidualsGPRFitter(DTGeometry const* DTGeom,
       m_value(npar(), 0.0),
       m_error(npar(), 0.0),
       m_loglikelihood(0.0),
-      m_datamap(data),
       m_options(opt) {}
 
 // if something happens comment out m_data, destructor and make it default
@@ -195,15 +93,6 @@ MuonResidualsGPRFitter::~MuonResidualsGPRFitter()
                 delete [] ptr;
             }
         }
-    }
-}
-
-void MuonResidualsGPRFitter::Fill(std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator it) 
-{
-    DetId id = it->first->geomDetId();
-    if (id.subdetId() == MuonSubdetId::DT || id.subdetId() == MuonSubdetId::CSC) 
-    {
-        m_datamap.insert(*it);
     }
 }
 
@@ -263,8 +152,58 @@ inline double ResidSlope(ResidData&& res_data, double R)
     return -0.5*track_dxdz/R*dy + (track_x/R - track_dxdz*track_dydz)*dphix + (1.0 + track_dxdz*track_dxdz)*dphiy - track_dydz*dphiz;
 }
 
+// input format: 
+// angle[0] = dphiz; 
+// angle[1] = dphiy;
+// angle[2] = dphix;
+// Reason: rotaions are executed from RIGHT to LEFT (bc of matrix multiplication)
+// first rotate around X by angle[2]
+// than rotate around Y by anlge[1]
+// lastly rotate around Z by angle[0]
+// https://en.wikipedia.org/wiki/Euler_angles#Conversion_to_other_orientation_representations
+// https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
+align::RotationType MatrixXYZ(align::EulerAngles const& angles)
+{
+    // Scalar is just a typedef for double
+    align::Scalar s1 = std::sin(angles[0]), c1 = std::cos(angles[0]);
+    align::Scalar s2 = std::sin(angles[1]), c2 = std::cos(angles[1]);
+    align::Scalar s3 = std::sin(angles[2]), c3 = std::cos(angles[2]);
+
+    // in constructor(fisrt row of the matrix,     xx xy xz
+    //                second row of the matrix,    yx yy yz
+    //                third row of the matrix)     zx zy zz
+    return align::RotationType(c1*c2, c1*s2*s3 - c3*s1, s1*s3 + c1*c3*s2,
+                               c2*s1, c1*c3 + s1*s2*s3, c3*s1*s2 - c1*s3,
+                               -s2, c2*s3, c2*c3);
+}
+
+align::RotationType MatrixXYZ(double dphix, double dphiy, double dphiz)
+{
+    align::EulerAngles angles(3);
+    angles[0] = dphiz;
+    angles[1] = dphiy;
+    angles[2] = dphix;
+
+    return MatrixXYZ(angles);
+}
+
+align::EulerAngles AnglesXYZ(align::RotationType const& matrix)
+{
+    align::EulerAngles res(3);
+    align::Scalar dphiy = std::asin(-1.0*matrix.zx());
+    align::Scalar dphiz = std::atan2(matrix.yx(), matrix.xx());
+    align::Scalar dphix = std::atan2(matrix.zy(), matrix.zz());
+
+    res[0] = dphix;
+    res[1] = dphiy;
+    res[2] = dphiz;
+
+    return res;
+}
+
 void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int iflag) 
 {
+    std::cout << std::setprecision(8);
     ++call_id;
     MuonResidualsGPRFitterFitInfo *fitinfo = (MuonResidualsGPRFitterFitInfo *)(minuit->GetObjectFit());
     MuonResidualsGPRFitter *gpr_fitter = fitinfo->gpr_fitter();
@@ -289,20 +228,36 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
 
             DTChamberId dtId(id.rawId());
             int station = dtId.station();
-            
+                         
             // transform rotation angle from global to local
-            align::EulerAngles globAngles(3);
-            globAngles[0] = par[static_cast<int>(PARAMS::kAlignPhiX)];
-            globAngles[1] = par[static_cast<int>(PARAMS::kAlignPhiY)];
-            globAngles[2] = par[static_cast<int>(PARAMS::kAlignPhiZ)];
-            align::RotationType mtrx = align::toMatrix(globAngles);
-            align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
+            // input format: 
+            // globAngles[0] = dphiz; 
+            // globAngles[1] = dphiy;
+            // globAngles[2] = dphix;
+            // Reason: rotaions are executed from RIGHT to LEFT (bc of matrix multiplication)
+            // first rotate around X by globAngles[2]
+            // than rotate around Y by globAngles[1]
+            // lastly rotate around Z by globAngles[0]
+            
+            double dphix = par[static_cast<int>(PARAMS::kAlignPhiX)];
+            double dphiy = par[static_cast<int>(PARAMS::kAlignPhiY)];
+            double dphiz = par[static_cast<int>(PARAMS::kAlignPhiZ)];
+
+            // align::RotationType glob_rot = MatrixXYZ(globAngles); // proper global gpr matrix in Z(3)Y(2)X(1) convection; 
+            align::RotationType glob_rot = MatrixXYZ(dphix, dphiy, dphiz);
+            align::RotationType loc_rot = orientation*glob_rot*orientation.transposed();
+            align::EulerAngles locAngles = AnglesXYZ(loc_rot);
+
+            // transformed angles
+            double alignphix_l = locAngles[0];
+            double alignphiy_l = locAngles[1];
+            double alignphiz_l = locAngles[2]; 
 
             // transform translations from global to local
             double dx, dy, dz;
-            dx = mtrx.xx()*position.x() + mtrx.yx()*position.y() + mtrx.zx()*position.z() - position.x();
-            dy = mtrx.xy()*position.x() + mtrx.yy()*position.y() + mtrx.zy()*position.z() - position.y();
-            dz = mtrx.xz()*position.x() + mtrx.yz()*position.y() + mtrx.zz()*position.z() - position.z();
+            dx = glob_rot.xx()*position.x() + glob_rot.xy()*position.y() + glob_rot.xz()*position.z() - position.x();
+            dy = glob_rot.yx()*position.x() + glob_rot.yy()*position.y() + glob_rot.yz()*position.z() - position.y();
+            dz = glob_rot.zx()*position.x() + glob_rot.zy()*position.y() + glob_rot.zz()*position.z() - position.z();
 
             double alignx_g = par[static_cast<int>(PARAMS::kAlignX)] + dx;
             double aligny_g = par[static_cast<int>(PARAMS::kAlignY)] + dy;
@@ -311,18 +266,22 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
             GlobalVector translation_g = GlobalVector(alignx_g, aligny_g, alignz_g);
             LocalVector translation_l = DTgeom->idToDet(id)->toLocal(translation_g);
 
-            // results of transformation
+            // transformed shifts
             double alignx_l = translation_l.x(); 
             double aligny_l = translation_l.y(); 
-            double alignz_l = translation_l.z(); 
-            double alignphix_l = locAngles[0];
-            double alignphiy_l = locAngles[1];
-            double alignphiz_l = locAngles[2]; 
+            double alignz_l = translation_l.z();
 
-            double resXsigma = 0.5;
-            double resYsigma = 1.0;
-            double slopeXsigma = 0.002;
-            double slopeYsigma = 0.005;
+            std::vector<double> sigmas = gpr_fitter->GetStdDevs(id);
+            double resXsigma = sigmas[static_cast<int>(DT_6DOF::kResidX)];
+            double resYsigma = sigmas[static_cast<int>(DT_6DOF::kResidY)];
+            double slopeXsigma = sigmas[static_cast<int>(DT_6DOF::kResSlopeX)];
+            double slopeYsigma = sigmas[static_cast<int>(DT_6DOF::kResSlopeY)];
+
+            // std::vector<double> means = gpr_fitter->GetMeans(id);
+            // double resXmean = means[static_cast<int>(DT_6DOF::kResidX)];
+            // double resYmean = means[static_cast<int>(DT_6DOF::kResidY)];
+            // double slopeXmean = means[static_cast<int>(DT_6DOF::kResSlopeX)];
+            // double slopeYmean = means[static_cast<int>(DT_6DOF::kResSlopeY)];
 
             if (station != 4)
             {
@@ -332,9 +291,13 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
                 for (it = resid_begin; it != resid_end; ++it)
                 {
                     double residX = (*it)[static_cast<int>(DT_6DOF::kResidX)];
+                    // if (std::abs(residX - resXmean) > 1.6*resXsigma) continue;
                     double residY = (*it)[static_cast<int>(DT_6DOF::kResidY)];
+                    // if (std::abs(residY - resYmean) > 1.6*resYsigma) continue;
                     double resslopeX = (*it)[static_cast<int>(DT_6DOF::kResSlopeX)];
+                    // if (std::abs(resslopeX - slopeXmean) > 1.6*slopeXsigma) continue;
                     double resslopeY = (*it)[static_cast<int>(DT_6DOF::kResSlopeY)];
+                    // if (std::abs(resslopeY - slopeYmean) > 1.6*slopeYsigma) continue;
                     double positionX = (*it)[static_cast<int>(DT_6DOF::kPositionX)];
                     double positionY = (*it)[static_cast<int>(DT_6DOF::kPositionY)];
                     double angleX = (*it)[static_cast<int>(DT_6DOF::kAngleX)];
@@ -444,203 +407,6 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
 }
 // NEW FCN END
 
-//FCN is fed to minuit; this is the function being minimized, i.e. log likelihood
-void MuonResidualsGPRFitter_FCN(int &npar, double *gin, double &fval, double *par, int iflag) 
-{
-    ++call_id;
-    MuonResidualsGPRFitterFitInfo *fitinfo = (MuonResidualsGPRFitterFitInfo *)(minuit->GetObjectFit());
-    MuonResidualsGPRFitter *gpr_fitter = fitinfo->gpr_fitter();
-    DTGeometry const* DTgeom = gpr_fitter->GetDTGeometry();
-    CSCGeometry const* CSCgeom = gpr_fitter->GetCSCGeometry();
-    
-    fval = 0.0; // likelihood
-    // loop over all chambers
-
-    if (gpr_fitter->Empty()) return;
-
-    using namespace std::chrono;
-    auto start = high_resolution_clock::now();
-    for (std::map<Alignable*, MuonResidualsTwoBin*>::const_iterator chamber_data = gpr_fitter->datamap_begin();
-                                                                    chamber_data != gpr_fitter->datamap_end();
-                                                                    ++chamber_data)
-    {
-        Alignable const* ali = chamber_data->first;
-        DetId id = ali->geomDetId();
-
-        if (!gpr_fitter->Select(id)) continue;
-
-        if (id.subdetId() == MuonSubdetId::DT && DTgeom) 
-        {
-            align::PositionType const& position = ali->globalPosition();
-            align::RotationType const& orientation = ali->globalRotation();
-
-            DTChamberId dtId(id.rawId());
-            int station = dtId.station();
-            
-            // transform rotation angle from global to local
-            align::EulerAngles globAngles(3);
-            globAngles[0] = par[static_cast<int>(PARAMS::kAlignPhiX)];
-            globAngles[1] = par[static_cast<int>(PARAMS::kAlignPhiY)];
-            globAngles[2] = par[static_cast<int>(PARAMS::kAlignPhiZ)];
-            align::RotationType mtrx = align::toMatrix(globAngles);
-            align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
-
-            // transform translations from global to local
-            double dx, dy, dz;
-            dx = mtrx.xx()*position.x() + mtrx.yx()*position.y() + mtrx.zx()*position.z() - position.x();
-            dy = mtrx.xy()*position.x() + mtrx.yy()*position.y() + mtrx.zy()*position.z() - position.y();
-            dz = mtrx.xz()*position.x() + mtrx.yz()*position.y() + mtrx.zz()*position.z() - position.z();
-
-            double alignx_g = par[static_cast<int>(PARAMS::kAlignX)] + dx;
-            double aligny_g = par[static_cast<int>(PARAMS::kAlignY)] + dy;
-            double alignz_g = par[static_cast<int>(PARAMS::kAlignZ)] + dz;
-
-            GlobalVector translation_g = GlobalVector(alignx_g, aligny_g, alignz_g);
-            LocalVector translation_l = DTgeom->idToDet(id)->toLocal(translation_g);
-
-            // results of transformation
-            double const alignx_l = translation_l.x(); 
-            double const aligny_l = translation_l.y(); 
-            double const alignz_l = translation_l.z(); 
-            double const alignphix_l = locAngles[0];
-            double const alignphiy_l = locAngles[1];
-            double const alignphiz_l = locAngles[2]; 
-
-            double resXsigma = 0.5;
-            double resYsigma = 1.0;
-            double slopeXsigma = 0.002;
-            double slopeYsigma = 0.005;
-
-            if (station != 4)
-            {
-                std::vector<double*>::const_iterator pos_begin = chamber_data->second->residualsPos_begin();
-                std::vector<double*>::const_iterator pos_end = chamber_data->second->residualsPos_end();
-                std::vector<double*>::const_iterator it = pos_begin;
-                for (it = pos_begin; it != pos_end; ++it)
-                {
-                    const double residX = (*it)[static_cast<int>(DT_6DOF::kResidX)];
-                    const double residY = (*it)[static_cast<int>(DT_6DOF::kResidY)];
-                    const double resslopeX = (*it)[static_cast<int>(DT_6DOF::kResSlopeX)];
-                    const double resslopeY = (*it)[static_cast<int>(DT_6DOF::kResSlopeY)];
-                    const double positionX = (*it)[static_cast<int>(DT_6DOF::kPositionX)];
-                    const double positionY = (*it)[static_cast<int>(DT_6DOF::kPositionY)];
-                    const double angleX = (*it)[static_cast<int>(DT_6DOF::kAngleX)];
-                    const double angleY = (*it)[static_cast<int>(DT_6DOF::kAngleY)];
-
-                    double alphaX = 0.0;
-                    double alphaY = 0.0;
-                    double residXpeak = residual_x(alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY, alphaX, resslopeX);
-                    double residYpeak = residual_y(alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY, alphaY, resslopeY);
-                    double slopeXpeak = residual_dxdz(alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY);
-                    double slopeYpeak = residual_dydz(alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY);
-
-                    double weight = 1.0;
-
-                    fval += -weight * MuonResidualsGPRFitter_logPureGaussian(residX, residXpeak, resXsigma);
-                    fval += -weight * MuonResidualsGPRFitter_logPureGaussian(residY, residYpeak, resYsigma);
-                    fval += -weight * MuonResidualsGPRFitter_logPureGaussian(resslopeX, slopeXpeak, slopeXsigma);
-                    fval += -weight * MuonResidualsGPRFitter_logPureGaussian(resslopeY, slopeYpeak, slopeYsigma);
-                }
-            }
-            else 
-            {
-                continue;
-            }
-        }
-
-        if (id.subdetId() == MuonSubdetId::CSC && CSCgeom)
-        {
-            align::PositionType const& position = ali->globalPosition();
-            align::RotationType const& orientation = ali->globalRotation();
-
-            double csc_x = position.x();
-            double csc_y = position.y();
-
-            double csc_R = sqrt(csc_x*csc_x + csc_y*csc_y);
-            // transform rotation angle from global to local
-            align::EulerAngles globAngles(3);
-            globAngles[0] = par[static_cast<int>(PARAMS::kAlignPhiX)];
-            globAngles[1] = par[static_cast<int>(PARAMS::kAlignPhiY)];
-            globAngles[2] = par[static_cast<int>(PARAMS::kAlignPhiZ)];
-            align::RotationType mtrx = align::toMatrix(globAngles);
-            align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
-
-            // transform translations from global to local
-            double dx, dy, dz;
-            dx = mtrx.xx()*position.x() + mtrx.yx()*position.y() + mtrx.zx()*position.z() - position.x();
-            dy = mtrx.xy()*position.x() + mtrx.yy()*position.y() + mtrx.zy()*position.z() - position.y();
-            dz = mtrx.xz()*position.x() + mtrx.yz()*position.y() + mtrx.zz()*position.z() - position.z();
-
-            double alignx_g = par[static_cast<int>(PARAMS::kAlignX)] + dx;
-            double aligny_g = par[static_cast<int>(PARAMS::kAlignY)] + dy;
-            double alignz_g = par[static_cast<int>(PARAMS::kAlignZ)] + dz;
-
-            GlobalVector translation_g = GlobalVector(alignx_g, aligny_g, alignz_g);
-            LocalVector translation_l = CSCgeom->idToDet(id)->toLocal(translation_g);
-
-            // results of transformation
-            double const alignx_l = translation_l.x(); 
-            double const aligny_l = translation_l.y(); 
-            double const alignz_l = translation_l.z(); 
-            double const alignphix_l = locAngles[0];
-            double const alignphiy_l = locAngles[1];
-            double const alignphiz_l = locAngles[2]; 
-
-            double resSigma = 0.5;
-            double resSlopeSigma = 0.002;
-
-            std::vector<double*>::const_iterator pos_begin = chamber_data->second->residualsPos_begin();
-            std::vector<double*>::const_iterator pos_end = chamber_data->second->residualsPos_end();
-            std::vector<double*>::const_iterator it = pos_begin;
-            for (it = pos_begin; it != pos_end; ++it)
-            {
-                const double resid = (*it)[static_cast<int>(CSC_6DOF::kResid)];
-                const double resSlope = (*it)[static_cast<int>(CSC_6DOF::kResSlope)];
-                const double positionX = (*it)[static_cast<int>(CSC_6DOF::kPositionX)];
-                const double positionY = (*it)[static_cast<int>(CSC_6DOF::kPositionY)];
-                const double angleX = (*it)[static_cast<int>(CSC_6DOF::kAngleX)];
-                const double angleY = (*it)[static_cast<int>(CSC_6DOF::kAngleY)];
-
-                double alpha = 0.0;
-                double residPeak = getResidual(alignx_l,
-                                               aligny_l,
-                                               alignz_l,
-                                               alignphix_l,
-                                               alignphiy_l,
-                                               alignphiz_l,
-                                               positionX,
-                                               positionY,
-                                               angleX,
-                                               angleY,
-                                               csc_R,
-                                               alpha,
-                                               resSlope);
-                double resSlopePeak = getResSlope(alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY, csc_R);
-
-                double weight = 1.0;
-
-                fval += -weight * MuonResidualsGPRFitter_logPureGaussian(resid, residPeak, resSigma);
-                fval += -weight * MuonResidualsGPRFitter_logPureGaussian(resSlope, resSlopePeak, resSlopeSigma);
-            }
-        }    
-    } // loop over chambers in the map ends
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<milliseconds>(stop - start);
-
-    // std::cout << "******************************************" << "\n";
-    std::cout << "FCN call #: " << call_id << "\n";
-    std::cout << "execution time " << duration.count() << " ms" << "\n";
-    std::cout << "FCN = " << fval << "\n";
-    std::cout << "params: ";
-    for (int i = 0; i < npar; ++i)
-    {
-        std::cout << par[i] << " ";
-    } 
-    std::cout << "\n";
-    std::cout << "******************************************" << "\n";
-    avg_call_duration += static_cast<double>(duration.count());
-}
-
 void MuonResidualsGPRFitter::inform(TMinuit* tMinuit) { minuit = tMinuit; }
 
 bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double *, int),
@@ -692,7 +458,8 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     {
         arglist[i] = 0.0;
     }
-    arglist[0] = 10.0;
+    // arglist[0] = 70.64402; // 99% CL
+    arglist[0] = 13.068225; // 70% CL
     ierflg = 0;
     smierflg = 0;
     MuonResidualsGPRFitter_TMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
@@ -718,34 +485,18 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
         return false;
     }
 
-    // double eps_machine(std::numeric_limits<double>::epsilon());
-    double eps = 1e-10;
-    for (int i = 0; i < 10; i++)
-    {
-        arglist[i] = 0.0;
-    }
-    arglist[0] = eps;
-    ierflg = 0;
-    MuonResidualsGPRFitter_TMinuit->mnexcm("SET EPS", arglist, 1, ierflg);
-    if (ierflg != 0) 
-    {
-        delete MuonResidualsGPRFitter_TMinuit;
-        delete fitinfo;
-        return false;
-    }
-
     int ndim = npar();
     double par[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     int flag = 1;
     double grad[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, fcn_zero, par, flag);
 
-    // double true_shift[6] = {-0.13942,0.47498,0.22497,-0.000392,0.000413,7.80781e-05};
-    // double calc_shift[6] = {-0.136652,0.474536,0.226821,-0.00038449,0.000405018,8.76458e-05};
+    double true_shift[6] = {0.0, 0.0, 0.0, -0.001, 0.002, -0.003};
 
-    // double min_fcn = 0.0;
-    // MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, true_shift, flag);
+    double min_fcn = 0.0;
+    MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, true_shift, flag);
     // std::cout << std::setprecision(10) << "FCN(true_shift) = " << min_fcn << "\n";
+    Tracer::instance() << std::setprecision(10) << "FCN(true_shift) = " << min_fcn << "\n";
     // min_fcn = 0.0;
     // MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, calc_shift, flag);
     // std::cout << std::setprecision(10) << "FCN(calc_shift) = " << min_fcn << "\n";
@@ -762,35 +513,12 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     MuonResidualsGPRFitter_TMinuit->mnexcm("MIGRAD", arglist, 1, ierflg);
     MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
 
-    double ratio = fedm/errdef;
-    double tolerFactor = (ratio < 1.0) ? 5.0 : std::ceil(ratio);
-    Tracer::instance() << "First MIGRAD:\n"
+    Tracer::instance() << "MIGRAD:\n"
                        << "fmin = " << fmin << "\n"
                        << "fedm = " << fedm << "\n"
                        << "istat = " << istat << "\n"
-                       << "ierflg = " << ierflg << "\n"
-                       << "fedm/errdef = " << ratio << "\n"
-                       << "tolerFactor = " << tolerFactor << "\n";
-
-    size_t nPar = npar();
-    std::vector<double> fMIGRAD_value(nPar, 0.0);
-    std::vector<double> fMIGRAD_error(nPar, 0.0);
-    for (size_t i = 0; i < nPar; ++i)
-    {
-        double v, e;
-        MuonResidualsGPRFitter_TMinuit->GetParameter(i, v, e);
-        fMIGRAD_value[i] = v;
-        fMIGRAD_error[i] = e;
-    }
-
-    Tracer::instance() << "fMIGRAD_value: ";
-    Tracer::instance().copy(fMIGRAD_value.begin(), fMIGRAD_value.end());
-    Tracer::instance() << "\n";
-    Tracer::instance() << "fMIGRAD_error: ";
-    Tracer::instance().copy(fMIGRAD_error.begin(), fMIGRAD_error.end());
-    Tracer::instance() << "\n";
-
-    
+                       << "ierflg = " << ierflg << "\n";
+                       
     if (ierflg != 0)
     {
         try_again = true;
@@ -803,96 +531,24 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
             arglist[i] = 0.0;
         }
         arglist[0] = 50000;
-        // arglist[1] = tolerFactor;
-        arglist[1] = tolerFactor*1000;
+        arglist[1] = 0.05;
         smierflg = 0;
         MuonResidualsGPRFitter_TMinuit->mnexcm("MIGRAD", arglist, 2, smierflg);
-        // MuonResidualsGPRFitter_TMinuit->mnexcm("SIMPLEX", arglist, 2, smierflg);
-        MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
-
-        Tracer::instance() << "Second MIGRAD:\n"
-                           << "fmin = " << fmin << "\n"
-                           << "fedm = " << fedm << "\n"
-                           << "istat = " << istat << "\n"
-                           << "smierflg = " << smierflg << "\n"; 
     }
 
-    std::vector<double> sMIGRAD_value(nPar, 0.0);
-    std::vector<double> sMIGRAD_error(nPar, 0.0);
-    if (try_again)
+    for (int i = 0; i < 10; i++)
     {
-        for (size_t i = 0; i < nPar; ++i)
-        {
-            double v, e;
-            MuonResidualsGPRFitter_TMinuit->GetParameter(i, v, e);
-            sMIGRAD_value[i] = v;
-            sMIGRAD_error[i] = e;
-        }
-        Tracer::instance() << "sMIGRAD_value: ";
-        Tracer::instance().copy(sMIGRAD_value.begin(), sMIGRAD_value.end());
-        Tracer::instance() << "\n";
-        Tracer::instance() << "sMIGRAD_error: ";
-        Tracer::instance().copy(sMIGRAD_error.begin(), sMIGRAD_error.end());
-        Tracer::instance() << "\n";
+        arglist[i] = 0.0;
     }
-
-    int sierflg = 0; // SIMPLEX error flag
-    if (try_again && smierflg != 0)
-    {
-        for (int i = 0; i < 10; i++)
-        {
-            arglist[i] = 0.0;
-        }
-        arglist[0] = 50000;
-        arglist[1] = tolerFactor;
-        MuonResidualsGPRFitter_TMinuit->mnexcm("SIMPLEX", arglist, 2, sierflg);
-        MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
-        Tracer::instance() << "SIMPLEX:\n"
-                           << "fmin = " << fmin << "\n"
-                           << "fedm = " << fedm << "\n"
-                           << "istat = " << istat << "\n"
-                           << "sierflg = " << sierflg << "\n";    
-    }
-
-    std::vector<double> SIMPLEX_value(nPar, 0.0);
-    std::vector<double> SIMPLEX_error(nPar, 0.0);
-    if (try_again && smierflg != 0)
-    {
-        for (size_t i = 0; i < nPar; ++i)
-        {
-            double v, e;
-            MuonResidualsGPRFitter_TMinuit->GetParameter(i, v, e);
-            SIMPLEX_value[i] = v;
-            SIMPLEX_error[i] = e;
-        }
-        Tracer::instance() << "SIMPLEX_value: ";
-        Tracer::instance().copy(SIMPLEX_value.begin(), SIMPLEX_value.end());
-        Tracer::instance() << "\n";
-        Tracer::instance() << "SIMPLEX_error: ";
-        Tracer::instance().copy(SIMPLEX_error.begin(), SIMPLEX_error.end());
-        Tracer::instance() << "\n";
-    }
-
-    if (sierflg != 0)
-    {
-        Tracer::instance() << "Fit failed\n";
-        delete MuonResidualsGPRFitter_TMinuit;
-        delete fitinfo;
-        return false;
-    }
-
-    if (istat != 3) 
-    {
-        for (int i = 0; i < 10; i++)
-        {
-            arglist[i] = 0.0;
-        }
-        ierflg = 0;
-        // MuonResidualsGPRFitter_TMinuit->mnexcm("HESSE", arglist, 0, ierflg);
-        MuonResidualsGPRFitter_TMinuit->mnexcm("MINOS", arglist, 0, ierflg);
-    }
-
+    ierflg = 0;
+    MuonResidualsGPRFitter_TMinuit->mnexcm("HESSE", arglist, 0, ierflg);
     MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
+
+    Tracer::instance() << "HESSE:\n"
+                       << "fmin = " << fmin << "\n"
+                       << "fedm = " << fedm << "\n"
+                       << "istat = " << istat << "\n"
+                       << "ierflg = " << ierflg << "\n";
 
     // read-out the results
     m_loglikelihood = -fmin;
@@ -907,31 +563,24 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
         m_error.push_back(e);
     }
 
+    min_fcn = 0.0;
+    MuonResidualsGPRFitter_TMinuit->Eval(ndim, grad, min_fcn, m_value.data(), flag);
+    Tracer::instance() << std::setprecision(10) << "FCN(calc_shift) = " << min_fcn << "\n";
+
     Tracer::instance() << "m_value: ";
     Tracer::instance().copy(m_value.begin(), m_value.end());
     Tracer::instance() << "\n";
     Tracer::instance() << "m_error: ";
     Tracer::instance().copy(m_error.begin(), m_error.end());
     Tracer::instance() << "\n";
-    Tracer::instance() << "fmin = " << fmin << "\n"
-                       << "fedm = " << fedm << "\n"
-                       << "errdef = " << errdef << "\n"
-                       << "npari = " << npari << "\n"
-                       << "nparx = " << nparx << "\n"
-                       << "istat = " << istat << "\n"
-                       << "ierflg = " << ierflg << "\n"
-                       << "smierflg = " << smierflg << "\n"
-                       << "npar() = " << npar() << "\n";
 
     avg_call_duration /= call_id;
     Tracer::instance() << "average call duration = " << avg_call_duration << " ms\n";
     Tracer::instance() << "# FCN calls = " << call_id << "\n";
-    call_id = 0;
-    avg_call_duration = 0.0f;
 
     delete MuonResidualsGPRFitter_TMinuit;
     delete fitinfo;
-    if (smierflg != 0 || sierflg != 0)
+    if (smierflg != 0)
     {
         return false;
     }    
@@ -978,7 +627,6 @@ bool MuonResidualsGPRFitter::Fit()
     std::vector<double> lows{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     std::vector<double> highs{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-    // return dofit(&MuonResidualsGPRFitter_FCN, nums, names, starts, steps, lows, highs);
     return dofit(&GlobalFitter_FCN, nums, names, starts, steps, lows, highs);
 }
 
@@ -1140,12 +788,28 @@ void MuonResidualsGPRFitter::CopyData(std::map<Alignable*, MuonResidualsTwoBin*>
         // don't copy what's not needed
         if (!Select(id)) continue;
 
+        if (id.subdetId() == MuonSubdetId::DT)
+        {
+            DTChamberId dtId(id.rawId());
+            int wheel = dtId.wheel();
+            int station = dtId.station();
+            int sector = dtId.sector();
+
+            // std::vector<int> allowed{1,4,7,10};
+            // if (std::find(allowed.begin(), allowed.end(), sector) == allowed.end()) continue;
+            // if (wheel != 1) continue;
+	        // if (station != 1) continue;
+            // if (sector != 7) continue;
+            std::cout << "Copying from " << wheel << "/" << station << "/" << sector << "\n"; 
+        }
+
         // sizes of arrays in vector
         size_t resPosSz = fitIt->second->numResidualsPos();
         size_t resNegSz = fitIt->second->numResidualsNeg();
 
         // select only fraction of residuals
         size_t totResSz = static_cast<size_t>(fraction*resPosSz) + static_cast<size_t>(fraction*resNegSz);
+        // std::cout << "\ttotResSz = " << totResSz << "\n";
 
         if (totResSz == 0) continue;
 
@@ -1255,17 +919,6 @@ void MuonResidualsGPRFitter::Print(int nValues, DetId const& id) const
         std::cout << "\n";
         std::cout << "-------------------------------------------------\n";
     }
-}
-
-void MuonResidualsGPRFitter::Print(int nValues, Alignable* ali) const
-{   
-    if (!ali) 
-    {
-        std::cout << "Alignable* ali is not pointing at any valid alignable\n";
-        return;
-    }
-    DetId id = ali->geomDetId();
-    Print(nValues, id);
 }
 
 bool MuonResidualsGPRFitter::Select(DetId const& id) const
@@ -1380,8 +1033,107 @@ void MuonResidualsGPRFitter::SaveResidDistr() const
     tFile->Close();
 }
 
-void MuonResidualsGPRFitter::PlotContours(int n_points)
+void MuonResidualsGPRFitter::SaveResidPeakDistr(std::vector<double> const& params) const
 {
+    std::unique_ptr<TFile> tFile = std::make_unique<TFile>("resid_peaks.root", "recreate");
+    for (auto const& [id, resid_vec]: m_data)
+    {
+        if (id.subdetId() == MuonSubdetId::DT)
+        {
+            Surface::PositionType position = m_DTGeometry->idToDet(id)->position();
+            Surface::RotationType orientation = m_DTGeometry->idToDet(id)->rotation();
+
+            align::RotationType glob_rot = MatrixXYZ(params[3], params[4], params[5]); // proper global gpr matrix in Z(3)Y(2)X(1) convention; 
+            align::RotationType loc_rot = orientation*glob_rot*orientation.transposed();
+            align::EulerAngles locAngles = AnglesXYZ(loc_rot);
+
+            double alignphix_l = locAngles[0];
+            double alignphiy_l = locAngles[1];
+            double alignphiz_l = locAngles[2]; 
+
+            double dx, dy, dz;
+            dx = glob_rot.xx()*position.x() + glob_rot.xy()*position.y() + glob_rot.xz()*position.z() - position.x();
+            dy = glob_rot.yx()*position.x() + glob_rot.yy()*position.y() + glob_rot.yz()*position.z() - position.y();
+            dz = glob_rot.zx()*position.x() + glob_rot.zy()*position.y() + glob_rot.zz()*position.z() - position.z();
+
+            double alignx_g = params[0] + dx;
+            double aligny_g = params[1] + dy;
+            double alignz_g = params[2] + dz;
+
+            GlobalVector translation_g = GlobalVector(alignx_g, aligny_g, alignz_g);
+            LocalVector translation_l = m_DTGeometry->idToDet(id)->toLocal(translation_g);
+
+            double alignx_l = translation_l.x(); 
+            double aligny_l = translation_l.y(); 
+            double alignz_l = translation_l.z(); 
+
+            DTChamberId dtId(id.rawId());
+            int wheel = dtId.wheel();
+            int station = dtId.station();
+            int sector = dtId.sector();
+
+            char tree_name[20];
+            std::sprintf(tree_name, "%d:%d:%d_tree", wheel, station, sector);
+            std::unique_ptr<TTree> tTree = std::make_unique<TTree>(tree_name, tree_name);
+
+            if (station != 4)
+            {
+                double residXpeak, residYpeak, residSlopeXpeak, residSlopeYpeak;
+                tTree->Branch("residXpeak", &residXpeak, "residXpeak/D");
+                tTree->Branch("residYpeak", &residYpeak, "residYpeak/D");
+                tTree->Branch("residSlopeXpeak", &residSlopeXpeak, "residSlopeXpeak/D");
+                tTree->Branch("residSlopeYpeak", &residSlopeYpeak, "residSlopeYpeak/D");
+
+                for (auto it = resid_vec.cbegin(); it != resid_vec.cend(); ++it)
+                {
+                    double resslopeX = (*it)[static_cast<int>(DT_6DOF::kResSlopeX)];
+                    double resslopeY = (*it)[static_cast<int>(DT_6DOF::kResSlopeY)];
+                    double positionX = (*it)[static_cast<int>(DT_6DOF::kPositionX)];
+                    double positionY = (*it)[static_cast<int>(DT_6DOF::kPositionY)];
+                    double angleX = (*it)[static_cast<int>(DT_6DOF::kAngleX)];
+                    double angleY = (*it)[static_cast<int>(DT_6DOF::kAngleY)];
+
+                    residXpeak = ResidX({alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY, resslopeX});
+                    residYpeak = ResidY({alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY, resslopeY});
+                    residSlopeXpeak = ResidDXDZ({alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY});
+                    residSlopeYpeak = ResidDYDZ({alignx_l, aligny_l, alignz_l, alignphix_l, alignphiy_l, alignphiz_l, positionX, positionY, angleX, angleY});
+
+                    tTree->Fill();
+                }
+
+                tFile->Write();
+            }
+            else
+            {
+                std::cout << "saving DT station 4 residual peaks\n";
+                // Double_t resid, residSlope;
+                // tTree->Branch("resid", &resid, "resid/D");
+                // tTree->Branch("residSlope", &residSlope, "residSlope/D");
+
+                // for (auto it = resid_vec.cbegin(); it != resid_vec.cend(); ++it)
+                // {
+                //     resid = (*it)[static_cast<int>(DT_5DOF::kResid)];
+                //     residSlope = (*it)[static_cast<int>(DT_5DOF::kResSlope)];
+                //     tTree->Fill();
+                // }
+
+                // tFile->Write();
+            }
+        }
+
+        if (id.subdetId() == MuonSubdetId::CSC)
+        {
+            std::cout << "saving CSC residual peaks\n";
+        }
+    }
+
+    tFile->Close();
+}
+
+void MuonResidualsGPRFitter::PlotContours(std::string selection, int n_points)
+{
+    if (selection.empty() || selection.size() > 4) return;
+
     MuonResidualsGPRFitterFitInfo* fitinfo = new MuonResidualsGPRFitterFitInfo(this);
     TMinuit* MuonResidualsGPRFitter_TMinuit = new TMinuit(npar());
     MuonResidualsGPRFitter_TMinuit->SetPrintLevel(-1);
@@ -1391,6 +1143,8 @@ void MuonResidualsGPRFitter::PlotContours(int n_points)
 
     int ndim = npar();
     std::vector<char const*> par_names{"dx", "dy", "dz", "dphix", "dphiy", "dphiz"};
+    std::map<char, double> error_table{{'1', 3.615}, {'2', 5.325}, {'3', 6.295}, {'4', 8.405}};
+    std::map<char, int> color_table{{'1', 1}, {'2', 2}, {'3', 3}, {'4', 4}};
     for (int i = 0; i < ndim; ++i)
     {
         MuonResidualsGPRFitter_TMinuit->DefineParameter(i, par_names[i], 0.0, 0.000001, 0.0, 0.0);
@@ -1399,39 +1153,38 @@ void MuonResidualsGPRFitter::PlotContours(int n_points)
     std::unique_ptr<TFile> file = std::make_unique<TFile>("contour_plots.root", "RECREATE");
     std::unique_ptr<TStyle> gStyle = std::make_unique<TStyle>();
 
-    for(int i = 0; i < ndim; ++i)
+    for (size_t i = 0; i < selection.size(); ++i)
     {
-        for (int j = i + 1; j < ndim; ++j)
-        {
-            std::unique_ptr<TCanvas> canvas = std::make_unique<TCanvas>("c", "c", 600, 450);
-            MuonResidualsGPRFitter_TMinuit->SetErrorDef(9);
-            TGraph* graph1 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
-            MuonResidualsGPRFitter_TMinuit->SetErrorDef(4);
-            TGraph* graph2 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
-            MuonResidualsGPRFitter_TMinuit->SetErrorDef(1);
-            TGraph* graph3 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
-            // MuonResidualsGPRFitter_TMinuit->SetErrorDef(25);
-            // TGraph* graph4 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
-            // MuonResidualsGPRFitter_TMinuit->SetErrorDef(16);
-            // TGraph* graph5 = (TGraph*)MuonResidualsGPRFitter_TMinuit->Contour(n_points,i,j);
+        double err_def = error_table[selection[i]];
+        if (err_def == 0) continue;
+        MuonResidualsGPRFitter_TMinuit->SetErrorDef(err_def*err_def);
+        int color = color_table[selection[i]];
 
-            graph1->GetXaxis()->SetTitle(par_names[i]);
-            graph1->GetYaxis()->SetTitle(par_names[j]);
-            graph1->SetLineColor(kBlue);
-            graph2->SetLineColor(kGreen);
-            graph3->SetLineColor(kRed);
-            // graph4->SetLineColor(kMagenta);
-            // graph5->SetLineColor(kBlack);
-            graph1->SetTitle(Form("Parameter contour %s vs %s", par_names[i], par_names[j]));
-            graph1->Draw();
-            file->WriteObject(graph1, Form("3sig_cnt_%s_%s", par_names[i], par_names[j]));
-            graph2->Draw("same");
-            file->WriteObject(graph2, Form("2sig_cnt_%s_%s", par_names[i], par_names[j]));
-            graph3->Draw("same");
-            file->WriteObject(graph3, Form("1sig_cnt_%s_%s", par_names[i], par_names[j]));
-            // graph4->Draw("same");
-            // graph5->Draw("same");
-            // canvas->SaveAs(Form("likelihood_plot_%s_%s.pdf", par_names[i], par_names[j]));
+        for (int p1 = 0; p1 < ndim; ++p1)
+        {
+            for (int p2 = p1 + 1; p2 < ndim; ++p2)
+            {
+                std::unique_ptr<TCanvas> canvas = std::make_unique<TCanvas>("c", "c", 600, 450);
+                TGraph* g = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1, p2));
+                if (!g) 
+                {
+                    Tracer::instance() << "Null pointer returned when drawing " << err_def << " countour for " << par_names[p1] << " vs " << par_names[p2] << "\n";
+                    continue;
+                }
+                try 
+                {
+                    g->GetXaxis()->SetTitle(par_names[p1]);
+                    g->GetYaxis()->SetTitle(par_names[p2]);
+                    g->SetLineColor(color);
+                    g->SetTitle(Form("Parameter contour %s vs %s", par_names[p1], par_names[p2]));
+                    g->Draw();
+                    file->WriteObject(g, Form("%dsig_cnt_%s_%s", color, par_names[p1], par_names[p2]));
+                }
+                catch (...)
+                {
+                    Tracer::instance() << "Exception caught when drawing " << err_def << " countour for " << par_names[p1] << " vs " << par_names[p2] << "\n";
+                }
+            }
         }
     }
 
@@ -1442,7 +1195,7 @@ void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 {
     MuonResidualsGPRFitterFitInfo* fitinfo = new MuonResidualsGPRFitterFitInfo(this);
     TMinuit* MuonResidualsGPRFitter_TMinuit = new TMinuit(npar());
-    MuonResidualsGPRFitter_TMinuit->SetPrintLevel(-1);
+    MuonResidualsGPRFitter_TMinuit->SetPrintLevel(1);
     MuonResidualsGPRFitter_TMinuit->SetObjectFit(fitinfo);
     MuonResidualsGPRFitter_TMinuit->SetFCN(GlobalFitter_FCN);
     inform(MuonResidualsGPRFitter_TMinuit);
@@ -1452,52 +1205,186 @@ void MuonResidualsGPRFitter::PlotContour(PARAMS par1, PARAMS par2, int n_points)
 
     int ndim = npar();
     std::vector<char const*> par_names{"dx", "dy", "dz", "dphix", "dphiy", "dphiz"};
-    std::vector<double> true_shifts{0.13942,-0.47498,-0.22497,0.000392,-0.000413,-7.80781e-05};
     for (int i = 0; i < ndim; ++i)
     {
         MuonResidualsGPRFitter_TMinuit->DefineParameter(i, par_names[i], 0.0, 0.000001, 0.0, 0.0);
     }
 
     std::unique_ptr<TCanvas> canvas = std::make_unique<TCanvas>("c", "c", 600, 450);
-    canvas->SetGrid(1);
+    canvas->SetGrid();
+    canvas->SetTickx();
+    canvas->SetTicky();
     auto mg = std::make_unique<TMultiGraph>("mg", Form("Parameter contour %s vs %s", par_names[p1idx], par_names[p2idx]));
 
-    MuonResidualsGPRFitter_TMinuit->SetErrorDef(1);
+    MuonResidualsGPRFitter_TMinuit->SetErrorDef(28.355625); // 90 CL
     TGraph* g1 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
     g1->SetLineColor(kRed);
     g1->SetLineWidth(3);
     g1->SetTitle("1 sig");
     g1->SetDrawOption("AL");
 
-    MuonResidualsGPRFitter_TMinuit->SetErrorDef(4);
+    MuonResidualsGPRFitter_TMinuit->SetErrorDef(39.627025); // 95 CL
     TGraph* g2 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
     g2->SetLineColor(kGreen);
     g2->SetLineWidth(3);
     g2->SetTitle("2 sig");
     g2->SetDrawOption("AL");
 
-    MuonResidualsGPRFitter_TMinuit->SetErrorDef(9);
+    MuonResidualsGPRFitter_TMinuit->SetErrorDef(70.64402); // 99 CL
     TGraph* g3 = static_cast<TGraph*>(MuonResidualsGPRFitter_TMinuit->Contour(n_points, p1idx, p2idx));
     g3->SetLineColor(kBlue);
     g3->SetLineWidth(3);
     g3->SetTitle("3 sig");
     g3->SetDrawOption("AL");
 
-    TGraph* m = new TGraph();
-    m->AddPoint(-true_shifts[p1idx], -true_shifts[p2idx]);
-    m->SetMarkerStyle(104);
-    m->SetMarkerColor(1);
-    m->SetMarkerSize(3);
-    m->SetDrawOption("AP");
-
     mg->Add(g1);
     mg->Add(g2);
     mg->Add(g3);
-    mg->Add(m);
     mg->GetXaxis()->SetTitle(par_names[p1idx]);
     mg->GetYaxis()->SetTitle(par_names[p2idx]);
     mg->SetTitle(Form("Parameter contour %s vs %s", par_names[p1idx], par_names[p2idx]));
     mg->Draw("ALP");
 
     canvas->SaveAs(Form("likelihood_plot_%s_%s.pdf", par_names[p1idx], par_names[p2idx]));
+}
+
+void MuonResidualsGPRFitter::CalcStats()
+{
+    if (m_data.empty()) return;
+
+    double val;
+
+    for (auto const& [id, resid_vec]: m_data)
+    {
+        int n = resid_vec.size();
+
+        if (id.subdetId() == MuonSubdetId::DT)
+        {
+            DTChamberId dtId(id.rawId());
+            int station = dtId.station();
+
+            if (station != 4)
+            {
+                double sum_sqr_dx = 0.0;
+                double sum_dx = 0.0;
+
+                double sum_sqr_dy = 0.0;
+                double sum_dy = 0.0;
+
+                double sum_sqr_dxdz = 0.0;
+                double sum_dxdz = 0.0;
+
+                double sum_sqr_dydz = 0.0;
+                double sum_dydz = 0.0;
+
+                for (auto res_ptr: resid_vec)
+                {
+                    val = res_ptr[static_cast<int>(DT_6DOF::kResidX)];
+                    sum_sqr_dx += val*val;
+                    sum_dx += val;
+
+                    val = res_ptr[static_cast<int>(DT_6DOF::kResidY)];
+                    sum_sqr_dy += val*val;
+                    sum_dy += val;
+
+                    val = res_ptr[static_cast<int>(DT_6DOF::kResSlopeX)];
+                    sum_sqr_dxdz += val*val;
+                    sum_dxdz += val;
+
+                    val = res_ptr[static_cast<int>(DT_6DOF::kResSlopeY)];
+                    sum_sqr_dydz += val*val;
+                    sum_dydz += val;
+                }
+
+                double residX_mean = sum_dx/n;
+                double residY_mean = sum_dy/n;
+                double resslopeX_mean = sum_dxdz/n;
+                double resslopeY_mean = sum_dydz/n;
+
+                double residX_stddev = sqrt(sum_sqr_dx/n - sum_dx*sum_dx/(n*n));
+                double residY_stddev = sqrt(sum_sqr_dy/n - sum_dy*sum_dy/(n*n));
+                double resslopeX_stddev = sqrt(sum_sqr_dxdz/n - sum_dxdz*sum_dxdz/(n*n));
+                double resslopeY_stddev = sqrt(sum_sqr_dydz/n - sum_dydz*sum_dydz/(n*n));
+
+                std::vector<double> stds{residX_stddev, residY_stddev, resslopeX_stddev, resslopeY_stddev};
+                std::vector<double> means{residX_mean, residY_mean, resslopeX_mean, resslopeY_mean};
+                std::cout << dtId.wheel() << "/" << station << "/" << dtId.sector() << ": \n\t";
+                std::copy(stds.begin(), stds.end(), std::ostream_iterator<double>(std::cout, " "));
+                std::cout << "\n\t";
+                std::copy(means.begin(), means.end(), std::ostream_iterator<double>(std::cout, " "));
+                std::cout << "\n";
+                // m_stddevs.insert({id, std::move(stds)});
+                m_stats.insert({id, {std::move(means), std::move(stds)}});
+            }
+            else
+            {
+                double sum_sqr_dx = 0.0;
+                double sum_dx = 0.0;
+
+                double sum_sqr_dxdz = 0.0;
+                double sum_dxdz = 0.0;
+
+                for (auto res_ptr: resid_vec)
+                {
+                    val = res_ptr[static_cast<int>(DT_5DOF::kResid)];
+                    sum_sqr_dx += val*val;
+                    sum_dx += val;
+
+                    val = res_ptr[static_cast<int>(DT_5DOF::kResSlope)];
+                    sum_sqr_dxdz += val*val;
+                    sum_dxdz += val;
+                }
+
+                double resid_mean = sum_dx/n;
+                double resslope_mean = sum_dxdz/n;
+
+                double resid_stddev = sqrt(sum_sqr_dx/n - sum_dx*sum_dx/(n*n));
+                double resslope_stddev = sqrt(sum_sqr_dxdz/n - sum_dxdz*sum_dxdz/(n*n));
+
+                std::vector<double> stds{resid_stddev, resslope_stddev};
+                std::vector<double> means{resid_mean, resslope_mean};
+                // m_stddevs.insert({id, std::move(stds)});
+                m_stats.insert({id, {std::move(means), std::move(stds)}});
+            }
+        }
+
+        if (id.subdetId() == MuonSubdetId::CSC)
+        {
+            double sum_sqr_dx = 0.0;
+            double sum_dx = 0.0;
+
+            double sum_sqr_dxdz = 0.0;
+            double sum_dxdz = 0.0;
+
+            for (auto res_ptr: resid_vec)
+            {
+                val = res_ptr[static_cast<int>(CSC_6DOF::kResid)];
+                sum_sqr_dx += val*val;
+                sum_dx += val;
+
+                val = res_ptr[static_cast<int>(CSC_6DOF::kResSlope)];
+                sum_sqr_dxdz += val*val;
+                sum_dxdz += val;
+            }
+
+            double resid_mean = sum_dx/n;
+            double resslope_mean = sum_dxdz/n;
+
+            double resid_stddev = sqrt(sum_sqr_dx/n - sum_dx*sum_dx/(n*n));
+            double resslope_stddev = sqrt(sum_sqr_dxdz/n - sum_dxdz*sum_dxdz/(n*n));
+
+            std::vector<double> stds{resid_stddev, resslope_stddev};
+            std::vector<double> means{resid_mean, resslope_mean};
+            // m_stddevs.insert({id, std::move(stds)});
+            m_stats.insert({id, {std::move(means), std::move(stds)}});
+        }
+    }
+}
+
+void MuonResidualsGPRFitter::Print(int nValues) const
+{
+    for (auto const& [id, resid_vec]: m_data)
+    {
+        Print(nValues, id);
+    }
 }
