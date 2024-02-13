@@ -8,8 +8,8 @@
 #include "DataFormats/MuonDetId/interface/DTChamberId.h"
 #include "TMath.h"
 #include "TH1.h"
-#include "TF1.h"
-#include "TVector2.h"
+// #include "TF1.h"
+// #include "TVector2.h"
 #include "TFile.h"
 #include "TTree.h"
 #include "TH2F.h"
@@ -19,12 +19,12 @@
 #include "TMarker.h"
 #include "TCanvas.h"
 #include "TGraph2D.h"
-#include "TRobustEstimator.h"
-#include "Math/MinimizerOptions.h"
+// #include "TRobustEstimator.h"
+// #include "Math/MinimizerOptions.h"
 
 #include <map>
 #include <iomanip>
-#include <functional>
+// #include <functional>
 #include <algorithm>
 #include <iterator>
 #include <chrono>
@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <memory>
 #include <fstream>
+#include <stdexcept>
 
 #include "Alignment/MuonAlignmentAlgorithms/interface/Tracer.hpp"
 #include "Alignment/CommonAlignment/interface/Utilities.h"
@@ -187,10 +188,17 @@ align::RotationType MatrixXYZ(double dphix, double dphiy, double dphiz)
     return MatrixXYZ(angles);
 }
 
+// Is designed to handled SMALL ANGLES ONLY!
+// small angle: sin < 0.1
+// Also in case when non-unique solution (gimbal lock) some angles will be forced o be pi/2, so this case should throw
+// https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
 align::EulerAngles AnglesXYZ(align::RotationType const& matrix)
 {
+    if (std::abs(matrix.zx()) >= 1) throw std::logic_error("Gimbal lock detected: ambiguous solution");
+    
     align::EulerAngles res(3);
     align::Scalar dphiy = std::asin(-1.0*matrix.zx());
+    if (std::abs(dphiy) > 0.1) throw std::out_of_range("Small angle approximation violated");
     align::Scalar dphiz = std::atan2(matrix.yx(), matrix.xx());
     align::Scalar dphix = std::atan2(matrix.zy(), matrix.zz());
 
@@ -291,13 +299,9 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
                 for (it = resid_begin; it != resid_end; ++it)
                 {
                     double residX = (*it)[static_cast<int>(DT_6DOF::kResidX)];
-                    // if (std::abs(residX - resXmean) > 1.6*resXsigma) continue;
                     double residY = (*it)[static_cast<int>(DT_6DOF::kResidY)];
-                    // if (std::abs(residY - resYmean) > 1.6*resYsigma) continue;
                     double resslopeX = (*it)[static_cast<int>(DT_6DOF::kResSlopeX)];
-                    // if (std::abs(resslopeX - slopeXmean) > 1.6*slopeXsigma) continue;
                     double resslopeY = (*it)[static_cast<int>(DT_6DOF::kResSlopeY)];
-                    // if (std::abs(resslopeY - slopeYmean) > 1.6*slopeYsigma) continue;
                     double positionX = (*it)[static_cast<int>(DT_6DOF::kPositionX)];
                     double positionY = (*it)[static_cast<int>(DT_6DOF::kPositionY)];
                     double angleX = (*it)[static_cast<int>(DT_6DOF::kAngleX)];
@@ -396,7 +400,7 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
     std::cout << "FCN call #: " << call_id << "\n";
     std::cout << "execution time " << duration.count() << " ms" << "\n";
     std::cout << "FCN = " << fval << "\n";
-    std::cout << "params: ";
+    std::cout << "global params: ";
     for (int i = 0; i < npar; ++i)
     {
         std::cout << par[i] << " ";
@@ -514,10 +518,10 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
 
     Tracer::instance() << "MIGRAD:\n"
-                       << "fmin = " << fmin << "\n"
-                       << "fedm = " << fedm << "\n"
-                       << "istat = " << istat << "\n"
-                       << "ierflg = " << ierflg << "\n";
+                       << "\tfmin = " << fmin << "\n"
+                       << "\tfedm = " << fedm << "\n"
+                       << "\tistat = " << istat << "\n"
+                       << "\tierflg = " << ierflg << "\n";
                        
     if (ierflg != 0)
     {
@@ -545,10 +549,10 @@ bool MuonResidualsGPRFitter::dofit(void (*fcn)(int &, double *, double &, double
     MuonResidualsGPRFitter_TMinuit->mnstat(fmin, fedm, errdef, npari, nparx, istat);
 
     Tracer::instance() << "HESSE:\n"
-                       << "fmin = " << fmin << "\n"
-                       << "fedm = " << fedm << "\n"
-                       << "istat = " << istat << "\n"
-                       << "ierflg = " << ierflg << "\n";
+                       << "\tfmin = " << fmin << "\n"
+                       << "\tfedm = " << fedm << "\n"
+                       << "\tistat = " << istat << "\n"
+                       << "\tierflg = " << ierflg << "\n";
 
     // read-out the results
     m_loglikelihood = -fmin;
@@ -616,12 +620,12 @@ bool MuonResidualsGPRFitter::Fit()
                                 0.0001,
                                 0.0001 };
 
-    std::vector<double> steps{ 0.01,
-                               0.01,
-                               0.01,
-                               0.0001,
-                               0.0001,
-                               0.0001 };
+    std::vector<double> steps{ 0.002,
+                               0.002,
+                               0.002,
+                               0.00002,
+                               0.00002,
+                               0.00002 };
 
     // parameter ranges 
     std::vector<double> lows{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -1144,7 +1148,7 @@ void MuonResidualsGPRFitter::PlotContours(std::string selection, int n_points)
     int ndim = npar();
     std::vector<char const*> par_names{"dx", "dy", "dz", "dphix", "dphiy", "dphiz"};
     std::map<char, double> error_table{{'1', 3.615}, {'2', 5.325}, {'3', 6.295}, {'4', 8.405}};
-    std::map<char, int> color_table{{'1', 1}, {'2', 2}, {'3', 3}, {'4', 4}};
+    std::map<char, int> color_table{{'1', 2}, {'2', 3}, {'3', 4}, {'4', 6}};
     for (int i = 0; i < ndim; ++i)
     {
         MuonResidualsGPRFitter_TMinuit->DefineParameter(i, par_names[i], 0.0, 0.000001, 0.0, 0.0);
@@ -1308,11 +1312,11 @@ void MuonResidualsGPRFitter::CalcStats()
 
                 std::vector<double> stds{residX_stddev, residY_stddev, resslopeX_stddev, resslopeY_stddev};
                 std::vector<double> means{residX_mean, residY_mean, resslopeX_mean, resslopeY_mean};
-                std::cout << dtId.wheel() << "/" << station << "/" << dtId.sector() << ": \n\t";
-                std::copy(stds.begin(), stds.end(), std::ostream_iterator<double>(std::cout, " "));
-                std::cout << "\n\t";
-                std::copy(means.begin(), means.end(), std::ostream_iterator<double>(std::cout, " "));
-                std::cout << "\n";
+                // std::cout << dtId.wheel() << "/" << station << "/" << dtId.sector() << ": \n\t";
+                // std::copy(stds.begin(), stds.end(), std::ostream_iterator<double>(std::cout, " "));
+                // std::cout << "\n\t";
+                // std::copy(means.begin(), means.end(), std::ostream_iterator<double>(std::cout, " "));
+                // std::cout << "\n";
                 // m_stddevs.insert({id, std::move(stds)});
                 m_stats.insert({id, {std::move(means), std::move(stds)}});
             }

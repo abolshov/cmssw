@@ -2217,29 +2217,13 @@ void MuonAlignmentFromReference::doGlobalAlignment()
   // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignPhiY);
   // GPRFitter.PlotContour(MuonResidualsGPRFitter::PARAMS::kAlignX, MuonResidualsGPRFitter::PARAMS::kAlignPhiZ);
 
-  // 10% from true value
-  // std::vector<double> lows{ -0.153362,0.427482,0.202473,-0.0004312,0.0003717,7.027029e-05 };
-  // std::vector<double> highs{ -0.125478,0.522478,0.247467,-0.0003528,0.0004543,8.588591e-05 };
-
-  // // 30% from true value
-  // std::vector<double> highs{ -0.097593, 0.617474, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
-  // std::vector<double> lows{ -0.131245, 0.332486, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
-  // int nPt = 25;
-
-  // std::vector<double> highs{ -0.13, 0.5, 0.292461, -0.0002743, 0.0005368, 0.0001015 };
-  // std::vector<double> lows{ -0.23, 0.2, 0.157478, -0.0005096, 0.000289, 5.465466e-05 };
-  // int nPt = 25;
-
-  // 50% from true value
-  // std::vector<double> highs{ -0.06971, 0.71247, 0.337455, -0.000196, 0.0006195, 11.711715e-05 };
-  // std::vector<double> lows{ -0.20913, 0.23749, 0.112485, -0.000588, 0.0002065, 3.903905e-05 };
   // int nPt = 20;
 
-  // std::vector<double> lows{ -0.1, -0.1, -0.1, -0.002, 0.001, -0.004};
-  // std::vector<double> highs{ 0.1, 0.1, 0.1, 0.0, 0.003, -0.002 };
+  // std::vector<double> lows{ -0.025, -0.025, -0.02, -0.00105, 0.00195, -0.00306 };
+  // std::vector<double> highs{ 0.025, 0.025, 0.02, -0.00095, 0.00205, -0.00294 };
 
   // GPRFitter.PlotFCN(nPt, lows, highs);
-  // GPRFitter.PlotContours("123", 12);
+  // GPRFitter.PlotContours("123", nPt);
 
   // GPRFitter.SaveResidPeakDistr({0.0, 0.0, 0.0, -0.001, 0.002, -0.003});
   // GPRFitter.SaveResidDistr();
