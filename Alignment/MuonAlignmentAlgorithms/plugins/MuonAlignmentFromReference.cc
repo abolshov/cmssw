@@ -2064,6 +2064,8 @@ void MuonAlignmentFromReference::doGlobalAlignment()
     Tracer::instance() << "Current track count: " << GPRFitter.TrackCount() << "\n";
     Tracer::instance() << "Number of chambers selected for alignment: " << GPRFitter.NumberOfChambers() << "\n";
 
+    GPRFitter.CalcStats();
+
     start = high_resolution_clock::now();
     gpr_fit_done = GPRFitter.Fit();
     stop = high_resolution_clock::now();

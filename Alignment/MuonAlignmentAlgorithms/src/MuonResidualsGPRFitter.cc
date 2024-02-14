@@ -194,7 +194,7 @@ align::RotationType MatrixXYZ(double dphix, double dphiy, double dphiz)
 // https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
 align::EulerAngles AnglesXYZ(align::RotationType const& matrix)
 {
-    if (std::abs(matrix.zx()) >= 1) throw std::logic_error("Gimbal lock detected: ambiguous solution");
+    if (std::abs(matrix.zx()) >= 1) throw std::logic_error("Gimbal lock detected: ambiguous solition");
     
     align::EulerAngles res(3);
     align::Scalar dphiy = std::asin(-1.0*matrix.zx());
@@ -337,18 +337,25 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
             double csc_R = sqrt(csc_x*csc_x + csc_y*csc_y);
 
             // transform rotation angle from global to local
-            align::EulerAngles globAngles(3);
-            globAngles[0] = par[static_cast<int>(PARAMS::kAlignPhiX)];
-            globAngles[1] = par[static_cast<int>(PARAMS::kAlignPhiY)];
-            globAngles[2] = par[static_cast<int>(PARAMS::kAlignPhiZ)];
-            align::RotationType mtrx = align::toMatrix(globAngles);
-            align::EulerAngles locAngles = align::toAngles(orientation*mtrx*orientation.transposed());
+            double dphix = par[static_cast<int>(PARAMS::kAlignPhiX)];
+            double dphiy = par[static_cast<int>(PARAMS::kAlignPhiY)];
+            double dphiz = par[static_cast<int>(PARAMS::kAlignPhiZ)];
+
+            // align::RotationType glob_rot = MatrixXYZ(globAngles); // proper global gpr matrix in Z(3)Y(2)X(1) convection; 
+            align::RotationType glob_rot = MatrixXYZ(dphix, dphiy, dphiz);
+            align::RotationType loc_rot = orientation*glob_rot*orientation.transposed();
+            align::EulerAngles locAngles = AnglesXYZ(loc_rot);
+
+            // transformed angles
+            double alignphix_l = locAngles[0];
+            double alignphiy_l = locAngles[1];
+            double alignphiz_l = locAngles[2]; 
 
             // transform translations from global to local
             double dx, dy, dz;
-            dx = mtrx.xx()*position.x() + mtrx.yx()*position.y() + mtrx.zx()*position.z() - position.x();
-            dy = mtrx.xy()*position.x() + mtrx.yy()*position.y() + mtrx.zy()*position.z() - position.y();
-            dz = mtrx.xz()*position.x() + mtrx.yz()*position.y() + mtrx.zz()*position.z() - position.z();
+            dx = glob_rot.xx()*position.x() + glob_rot.xy()*position.y() + glob_rot.xz()*position.z() - position.x();
+            dy = glob_rot.yx()*position.x() + glob_rot.yy()*position.y() + glob_rot.yz()*position.z() - position.y();
+            dz = glob_rot.zx()*position.x() + glob_rot.zy()*position.y() + glob_rot.zz()*position.z() - position.z();
 
             double alignx_g = par[static_cast<int>(PARAMS::kAlignX)] + dx;
             double aligny_g = par[static_cast<int>(PARAMS::kAlignY)] + dy;
@@ -357,17 +364,17 @@ void GlobalFitter_FCN(int &npar, double *gin, double &fval, double *par, int ifl
             GlobalVector translation_g = GlobalVector(alignx_g, aligny_g, alignz_g);
             LocalVector translation_l = CSCgeom->idToDet(id)->toLocal(translation_g);
 
-            // results of transformation
+            // transformed shifts
             double alignx_l = translation_l.x(); 
             double aligny_l = translation_l.y(); 
-            double alignz_l = translation_l.z(); 
-            double alignphix_l = locAngles[0];
-            double alignphiy_l = locAngles[1];
-            double alignphiz_l = locAngles[2]; 
+            double alignz_l = translation_l.z();
 
-            double resSigma = 0.5;
-            double resSlopeSigma = 0.002;
-
+            // double resSigma = 0.5;
+            // double resSlopeSigma = 0.002;
+            std::vector<double> sigmas = gpr_fitter->GetStdDevs(id);
+            double resSigma = sigmas[static_cast<int>(CSC_6DOF::kResid)];
+            double resSlopeSigma = sigmas[static_cast<int>(CSC_6DOF::kResSlope)];
+            
             std::vector<double*>::const_iterator resid_begin = resid_vec.cbegin();
             std::vector<double*>::const_iterator resid_end = resid_vec.cend();
             std::vector<double*>::const_iterator it = resid_begin;
@@ -792,20 +799,20 @@ void MuonResidualsGPRFitter::CopyData(std::map<Alignable*, MuonResidualsTwoBin*>
         // don't copy what's not needed
         if (!Select(id)) continue;
 
-        if (id.subdetId() == MuonSubdetId::DT)
-        {
-            DTChamberId dtId(id.rawId());
-            int wheel = dtId.wheel();
-            int station = dtId.station();
-            int sector = dtId.sector();
+        // if (id.subdetId() == MuonSubdetId::DT)
+        // {
+        //     DTChamberId dtId(id.rawId());
+        //     int wheel = dtId.wheel();
+        //     int station = dtId.station();
+        //     int sector = dtId.sector();
 
-            // std::vector<int> allowed{1,4,7,10};
-            // if (std::find(allowed.begin(), allowed.end(), sector) == allowed.end()) continue;
-            // if (wheel != 1) continue;
-	        // if (station != 1) continue;
-            // if (sector != 7) continue;
-            std::cout << "Copying from " << wheel << "/" << station << "/" << sector << "\n"; 
-        }
+        //     // std::vector<int> allowed{1,4,7,10};
+        //     // if (std::find(allowed.begin(), allowed.end(), sector) == allowed.end()) continue;
+        //     // if (wheel != 1) continue;
+	    //     // if (station != 1) continue;
+        //     // if (sector != 7) continue;
+        //     std::cout << "Copying from " << wheel << "/" << station << "/" << sector << "\n"; 
+        // }
 
         // sizes of arrays in vector
         size_t resPosSz = fitIt->second->numResidualsPos();
