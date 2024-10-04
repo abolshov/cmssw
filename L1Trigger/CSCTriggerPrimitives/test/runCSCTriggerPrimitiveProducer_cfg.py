@@ -318,3 +318,12 @@ if options.saveEdmOutput:
       process.schedule.extend([process.p5])
 
 process.schedule.extend([process.p6])
+
+process.GEMCSCTriggerPrimitivesReader = cms.EDAnalyzer('GEMCSCTriggerPrimitivesReader', 
+      CSCLCTProducerData = cms.untracked.string("muonCSCDigis"),
+      CSCLCTProducerEmul = cms.untracked.string("cscTriggerPrimitiveDigis"),
+      debug = cms.bool(False),
+      )
+process.TFileService = cms.Service("TFileService", fileName = cms.string("reader_output.root"))
+process.p7 = cms.EndPath(process.GEMCSCTriggerPrimitivesReader)
+process.schedule.extend([process.p7])

@@ -8,6 +8,32 @@
 <use name="Geometry/CSCGeometry"/>
 <use name="L1Trigger/CSCTriggerPrimitives"/>
 <use name="rootgraphics"/>
+<use name="FWCore/PluginManager"/>
+<use name="clhep"/>
+<use name="root"/>
+<use name="rootcore"/>
+<use name="CommonTools/UtilAlgos"/>
+<use name="SimDataFormats/Track"/>
+<use name="SimDataFormats/Vertex"/>
+<use name="DataFormats/VertexReco"/>
+<use name="DataFormats/MuonReco"/>
+<use name="DataFormats/DetId"/>
+<use name="DataFormats/HepMCCandidate"/>
+<use name="DataFormats/TrackReco"/>
+<use name="DataFormats/PatCandidates"/>
+<use name="SimMuon/MCTruth"/>
+<use name="SimDataFormats/TrackingAnalysis"/>
+<use name="RecoMuon/TrackingTools"/>
+<use name="Geometry/GEMGeometry"/>
+<use name="PhysicsTools/PatUtils"/>
+<use name="JetMETCorrections/JetCorrector"/>
+<use name="CondCore/PopCon"/>
+<use name="CondFormats/GEMObjects"/>
+<use name="Alignment/MuonAlignment"/>
+<use name="Alignment/CommonAlignmentAlgorithm"/>
+<use name="CondFormats/Alignment"/>
+<use name="CondFormats/AlignmentRecord"/>
+<use name="Geometry/DTGeometry"/>
 <library file="*.cc" name="CSCTriggerPrimitivesPlugins">
   <flags EDM_PLUGIN="1"/>
 </library>
