@@ -266,7 +266,6 @@ int CSCGEMMatcher::matchedClusterDistES(const CSCCLCTDigi& clct,
                                  : lookupTableME21ILT->GEM_align_corr_es_ME21_negative_endcap(chamber_, cl.roll1());
   }
 
-  alignCorrection = 0;
   int eighthStripDiff = cl_es + alignCorrection - clct.getKeyStrip(8);
 
   if (matchCLCTpropagation_ and !ForceTotal) {  //modification of DeltaStrip by CLCT slope
