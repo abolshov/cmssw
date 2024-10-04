@@ -14,6 +14,9 @@ CSCL1TPLookupTableME21ILT::CSCL1TPLookupTableME21ILT()
       GEM_roll_L2_CSC_min_wg_ME21_odd_(0),
       GEM_roll_L2_CSC_max_wg_ME21_odd_(0),
 
+      GEM_align_corr_es_ME21_positive_endcap_(0),
+      GEM_align_corr_es_ME21_negative_endcap_(0),
+
       CSC_slope_cosi_2to1_L1_ME21_even_(0),
       CSC_slope_cosi_2to1_L1_ME21_odd_(0),
       CSC_slope_cosi_3to1_L1_ME21_even_(0),
@@ -66,6 +69,14 @@ void CSCL1TPLookupTableME21ILT::set_GEM_roll_L2_CSC_min_wg_ME21_odd(t_lut lut) {
 
 void CSCL1TPLookupTableME21ILT::set_GEM_roll_L2_CSC_max_wg_ME21_odd(t_lut lut) {
   GEM_roll_L2_CSC_max_wg_ME21_odd_ = std::move(lut);
+}
+
+void CSCL1TPLookupTableME21ILT::set_GEM_align_corr_es_ME21_positive_endcap(t_lut_signed lut) {
+  GEM_align_corr_es_ME21_positive_endcap_ = std::move(lut);
+}
+
+void CSCL1TPLookupTableME21ILT::set_GEM_align_corr_es_ME21_negative_endcap(t_lut_signed lut) {
+  GEM_align_corr_es_ME21_negative_endcap_ = std::move(lut);
 }
 
 void CSCL1TPLookupTableME21ILT::set_CSC_slope_cosi_2to1_L1_ME21_even(t_lut lut) {
@@ -162,6 +173,14 @@ unsigned CSCL1TPLookupTableME21ILT::GEM_roll_L2_CSC_min_wg_ME21_odd(unsigned rol
 
 unsigned CSCL1TPLookupTableME21ILT::GEM_roll_L2_CSC_max_wg_ME21_odd(unsigned roll) const {
   return GEM_roll_L2_CSC_max_wg_ME21_odd_[roll];
+}
+
+int CSCL1TPLookupTableME21ILT::GEM_align_corr_es_ME21_positive_endcap(unsigned chamber, unsigned roll) const {
+  return GEM_align_corr_es_ME21_positive_endcap_[16*(chamber-1)+(roll-1)];
+}
+
+int CSCL1TPLookupTableME21ILT::GEM_align_corr_es_ME21_negative_endcap(unsigned chamber, unsigned roll) const {
+  return GEM_align_corr_es_ME21_negative_endcap_[16*(chamber-1)+(roll-1)];
 }
 
 unsigned CSCL1TPLookupTableME21ILT::CSC_slope_cosi_2to1_L1_ME21_even(unsigned slope) const {

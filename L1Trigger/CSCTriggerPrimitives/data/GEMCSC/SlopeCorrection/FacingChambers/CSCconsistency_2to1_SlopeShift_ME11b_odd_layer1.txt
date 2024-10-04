@@ -1,0 +1,19 @@
+#CLCT slope mitigation for category 2 inconsistent slopes
+#Structure is input slope (uint16_t) -> output slope (uint16_t)
+#<header> v1.0 4 32 </header>
+0 0
+1 1
+2 2
+3 2
+4 3
+5 4
+6 5
+7 5
+8 6
+9 7
+10 8
+11 9
+12 9
+13 10
+14 11
+15 12

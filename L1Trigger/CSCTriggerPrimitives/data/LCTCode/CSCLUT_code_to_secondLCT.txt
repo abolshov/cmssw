@@ -1,0 +1,19 @@
+# LUT defines correspondence between ALCT-CLCT combination code
+# and the resulting second best lct2
+#<header> v1.0 4 32 </header>
+0 0
+1 0
+2 0
+3 22
+4 0
+5 22
+6 21
+7 21
+8 0
+9 22
+10 21
+11 22
+12 12
+13 22
+14 12
+15 22

@@ -1,0 +1,19 @@
+#GEM to CSC matching slope correction without consistency criteria
+#Structure is input slope (uint16_t) -> 1/8th strip unit position correction (uint16_t)
+#<header> v1.0 4 32 </header>
+0 0
+1 9
+2 18
+3 27
+4 37
+5 46
+6 55
+7 64
+8 73
+9 82
+10 91
+11 100
+12 110
+13 119
+14 132
+15 160

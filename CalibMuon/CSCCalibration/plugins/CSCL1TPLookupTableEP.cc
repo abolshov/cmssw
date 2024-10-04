@@ -36,6 +36,7 @@ protected:
 
 private:
   std::vector<unsigned> load(std::string fileName) const;
+  std::vector<int> load_signed(std::string fileName) const;
   const edm::ParameterSet pset_;
 };
 
@@ -90,6 +91,8 @@ std::unique_ptr<CSCL1TPLookupTableME11ILT> CSCL1TPLookupTableEP::produceME11ILT(
   std::vector<std::string> rollToMaxWgME11Files_ = pset_.getParameter<std::vector<std::string>>("rollToMaxWgME11Files");
   std::vector<std::string> rollToMinWgME11Files_ = pset_.getParameter<std::vector<std::string>>("rollToMinWgME11Files");
 
+  std::vector<std::string> gemAlignCorrME11Files_ = pset_.getParameter<std::vector<std::string>>("gemAlignCorrME11Files");
+
   std::vector<std::string> gemCscSlopeCosiFiles_ = pset_.getParameter<std::vector<std::string>>("gemCscSlopeCosiFiles");
   std::vector<std::string> gemCscSlopeCosiCorrectionFiles_ =
       pset_.getParameter<std::vector<std::string>>("gemCscSlopeCosiCorrectionFiles");
@@ -111,6 +114,9 @@ std::unique_ptr<CSCL1TPLookupTableME11ILT> CSCL1TPLookupTableEP::produceME11ILT(
   auto GEM_roll_CSC_min_wg_ME11_odd_ = load(rollToMinWgME11Files_[1]);
   auto GEM_roll_CSC_max_wg_ME11_even_ = load(rollToMaxWgME11Files_[0]);
   auto GEM_roll_CSC_max_wg_ME11_odd_ = load(rollToMaxWgME11Files_[1]);
+
+  auto GEM_align_corr_es_ME11_positive_endcap_ = load_signed(gemAlignCorrME11Files_[0]);
+  auto GEM_align_corr_es_ME11_negative_endcap_ = load_signed(gemAlignCorrME11Files_[1]);
 
   auto CSC_slope_cosi_2to1_L1_ME11a_even_ = load(gemCscSlopeCosiFiles_[0]);
   auto CSC_slope_cosi_2to1_L1_ME11a_odd_ = load(gemCscSlopeCosiFiles_[1]);
@@ -157,6 +163,9 @@ std::unique_ptr<CSCL1TPLookupTableME11ILT> CSCL1TPLookupTableEP::produceME11ILT(
   lut->set_GEM_roll_CSC_max_wg_ME11_even(std::move(GEM_roll_CSC_max_wg_ME11_even_));
   lut->set_GEM_roll_CSC_max_wg_ME11_odd(std::move(GEM_roll_CSC_max_wg_ME11_odd_));
 
+  lut->set_GEM_align_corr_es_ME11_positive_endcap(std::move(GEM_align_corr_es_ME11_positive_endcap_));
+  lut->set_GEM_align_corr_es_ME11_negative_endcap(std::move(GEM_align_corr_es_ME11_negative_endcap_));
+
   // GEM-CSC trigger: slope correction
   lut->set_CSC_slope_cosi_2to1_L1_ME11a_even(std::move(CSC_slope_cosi_2to1_L1_ME11a_even_));
   lut->set_CSC_slope_cosi_2to1_L1_ME11a_odd(std::move(CSC_slope_cosi_2to1_L1_ME11a_odd_));
@@ -201,6 +210,8 @@ std::unique_ptr<CSCL1TPLookupTableME21ILT> CSCL1TPLookupTableEP::produceME21ILT(
   std::vector<std::string> rollToMaxWgME21Files_ = pset_.getParameter<std::vector<std::string>>("rollToMaxWgME21Files");
   std::vector<std::string> rollToMinWgME21Files_ = pset_.getParameter<std::vector<std::string>>("rollToMinWgME21Files");
 
+  std::vector<std::string> gemAlignCorrME21Files_ = pset_.getParameter<std::vector<std::string>>("gemAlignCorrME21Files");
+
   std::vector<std::string> gemCscSlopeCosiFiles_ = pset_.getParameter<std::vector<std::string>>("gemCscSlopeCosiFiles");
   std::vector<std::string> gemCscSlopeCosiCorrectionFiles_ =
       pset_.getParameter<std::vector<std::string>>("gemCscSlopeCosiCorrectionFiles");
@@ -223,6 +234,9 @@ std::unique_ptr<CSCL1TPLookupTableME21ILT> CSCL1TPLookupTableEP::produceME21ILT(
   auto GEM_roll_L1_CSC_max_wg_ME21_odd_ = load(rollToMaxWgME21Files_[1]);
   auto GEM_roll_L2_CSC_max_wg_ME21_even_ = load(rollToMaxWgME21Files_[2]);
   auto GEM_roll_L2_CSC_max_wg_ME21_odd_ = load(rollToMaxWgME21Files_[3]);
+
+  auto GEM_align_corr_es_ME21_positive_endcap_ = load_signed(gemAlignCorrME21Files_[0]);
+  auto GEM_align_corr_es_ME21_negative_endcap_ = load_signed(gemAlignCorrME21Files_[1]);
 
   auto es_diff_slope_L1_ME21_even_ = load(esDiffToSlopeME21Files_[0]);
   auto es_diff_slope_L1_ME21_odd_ = load(esDiffToSlopeME21Files_[1]);
@@ -255,6 +269,9 @@ std::unique_ptr<CSCL1TPLookupTableME21ILT> CSCL1TPLookupTableEP::produceME21ILT(
   lut->set_GEM_roll_L2_CSC_max_wg_ME21_even(std::move(GEM_roll_L2_CSC_max_wg_ME21_even_));
   lut->set_GEM_roll_L2_CSC_min_wg_ME21_odd(std::move(GEM_roll_L2_CSC_min_wg_ME21_odd_));
   lut->set_GEM_roll_L2_CSC_max_wg_ME21_odd(std::move(GEM_roll_L2_CSC_max_wg_ME21_odd_));
+
+  lut->set_GEM_align_corr_es_ME21_positive_endcap(std::move(GEM_align_corr_es_ME21_positive_endcap_));
+  lut->set_GEM_align_corr_es_ME21_negative_endcap(std::move(GEM_align_corr_es_ME21_negative_endcap_));
 
   lut->set_es_diff_slope_L1_ME21_even(std::move(es_diff_slope_L1_ME21_even_));
   lut->set_es_diff_slope_L1_ME21_odd(std::move(es_diff_slope_L1_ME21_odd_));
@@ -291,6 +308,30 @@ std::vector<unsigned> CSCL1TPLookupTableEP::load(std::string fileName) const {
     line.erase(std::find(line.begin(), line.end(), '#'), line.end());
     std::istringstream lineStream(line);
     std::pair<unsigned, unsigned> entry;
+    while (lineStream >> entry.first >> entry.second) {
+      returnV.push_back(entry.second);
+    }
+  }
+  return returnV;
+}
+
+std::vector<int> CSCL1TPLookupTableEP::load_signed(std::string fileName) const {
+  std::vector<int> returnV;
+  std::ifstream fstream;
+  fstream.open(edm::FileInPath(fileName.c_str()).fullPath());
+  // empty file, return empty lut
+  if (!fstream.good()) {
+    fstream.close();
+    return returnV;
+  }
+
+  std::string line;
+
+  while (std::getline(fstream, line)) {
+    //ignore comments
+    line.erase(std::find(line.begin(), line.end(), '#'), line.end());
+    std::istringstream lineStream(line);
+    std::pair<unsigned, int> entry;
     while (lineStream >> entry.first >> entry.second) {
       returnV.push_back(entry.second);
     }

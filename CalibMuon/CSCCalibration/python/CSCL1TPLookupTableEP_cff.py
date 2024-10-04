@@ -56,6 +56,16 @@ CSCL1TPLookupTableEP = cms.ESSource(
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/CoordinateConversion/GEMCSCLUT_roll_l2_max_wg_ME21_even.txt",
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/CoordinateConversion/GEMCSCLUT_roll_l2_max_wg_ME21_odd.txt",
     ),
+    ## GEM alignment correction in ME11
+    gemAlignCorrME11Files = cms.vstring(
+        "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/AlignmentCorrection/GEMCSCLUT_align_corr_es_ME11_positive_endcap.txt",
+        "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/AlignmentCorrection/GEMCSCLUT_align_corr_es_ME11_negative_endcap.txt",
+    ),
+    ## GEM alignment correction in ME21
+    gemAlignCorrME21Files = cms.vstring(
+        "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/AlignmentCorrection/GEMCSCLUT_align_corr_es_ME21_positive_endcap.txt",
+        "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/AlignmentCorrection/GEMCSCLUT_align_corr_es_ME21_negative_endcap.txt",
+    ),
     # lookup tables for the GEM-CSC slope correction
     gemCscSlopeCorrectionFiles = cms.vstring(
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/SlopeCorrection/FacingChambers/ExtrapolationBySlope_ME11a_even_GEMlayer1.txt",
@@ -109,9 +119,9 @@ CSCL1TPLookupTableEP = cms.ESSource(
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME11b_odd_GEMlayer2.txt",
     ),
     esDiffToSlopeME21Files = cms.vstring(
-	"L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_even_GEMlayer1.txt",
-	"L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_odd_GEMlayer1.txt",
+	    "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_even_GEMlayer1.txt",
+	    "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_odd_GEMlayer1.txt",
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_even_GEMlayer2.txt",
         "L1Trigger/CSCTriggerPrimitives/data/GEMCSC/BendingAngle/SlopeAmendment_ME21_odd_GEMlayer2.txt",
     ),
-   )
+)
